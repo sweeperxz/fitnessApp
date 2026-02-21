@@ -133,7 +133,7 @@ export default function ProfilePage({ onLogout }) {
           <div className="card-label">О приложении</div>
           <div className="setting-row"><span className="setting-label">Версия</span><span className="setting-val">2.0 PWA</span></div>
           <div className="setting-row"><span className="setting-label">База продуктов</span><span className="setting-val">Open Food Facts</span></div>
-          <div className="setting-row"><span className="setting-label">ИИ</span><span className="setting-val">Claude API</span></div>
+          <div className="setting-row"><span className="setting-label">ИИ</span><span className="setting-val">Gemini API</span></div>
         </div>
       </>}
     </>

@@ -77,3 +77,17 @@ class Exercise(Base):
     weight_kg  = Column(Float, default=0)
 
     workout = relationship("Workout", back_populates="exercises")
+
+
+class UserFood(Base):
+    __tablename__ = "user_foods"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    name = Column(String, index=True)
+    brand = Column(String, nullable=True)
+    calories = Column(Integer)
+    protein = Column(Integer)
+    fat = Column(Integer)
+    carbs = Column(Integer)
+    last_used = Column(DateTime, default=func.now())

@@ -39,3 +39,9 @@ export const addExercise   = (wid, d) => api.post(`/workouts/${wid}/exercises`, 
 export const deleteWorkout = id  => api.delete(`/workouts/${id}`)
 
 export const getStats = (days = 30) => api.get('/stats', { params: { days } }).then(r => r.data)
+
+// ДОБАВИТЬ ЭТУ СТРОКУ:
+export const sendChatMessage = d => api.post('/ai/chat', d).then(r => r.data)
+
+export const getRecentFoods = () => api.get('/foods/recent').then(r => r.data)
+export const addRecentFood = d => api.post('/foods/recent', d).then(r => r.data)

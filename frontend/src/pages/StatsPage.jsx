@@ -4,17 +4,19 @@ import dayjs from 'dayjs'
 import { getStats, getProfile } from '../api'
 
 const PERIODS = [{l:'7 дней',d:7},{l:'14 дней',d:14},{l:'30 дней',d:30}]
+
+// 1. Юзер-френдли цвета (HEX), которые не сломают SVG-градиент
 const CHARTS = [
-  {key:'calories',label:'Калории',   dataKey:'ккал',     color:'var(--accent)', unit:'ккал'},
-  {key:'protein', label:'Белки',     dataKey:'г белка',  color:'#a78bfa',       unit:'г'},
-  {key:'water',   label:'Вода',      dataKey:'мл',       color:'#38bdf8',       unit:'мл'},
-  {key:'workout', label:'Тренировки',dataKey:'шт',       color:'var(--accent3)',unit:''},
+  {key:'calories',label:'Калории',   dataKey:'ккал',     color:'#FF7A00', unit:'ккал'}, // Энергичный оранжевый
+  {key:'protein', label:'Белки',     dataKey:'г белка',  color:'#8B5CF6', unit:'г'},    // Насыщенный фиолетовый
+  {key:'water',   label:'Вода',      dataKey:'мл',       color:'#0EA5E9', unit:'мл'},   // Чистый голубой
+  {key:'workout', label:'Тренировки',dataKey:'шт',       color:'#10B981', unit:''},     // Активный изумрудный
 ]
 
 const Tip = ({active,payload,label,unit}) => {
   if (!active||!payload?.length) return null
   return (
-    <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'8px 12px'}}>
+    <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:'8px 12px',boxShadow:'0 4px 12px rgba(0,0,0,0.1)'}}>
       <div style={{color:'var(--text2)',fontSize:11,marginBottom:2}}>{label}</div>
       <div style={{color:payload[0]?.color,fontWeight:800,fontSize:14}}>{Math.round(payload[0]?.value)}{unit}</div>
     </div>
@@ -76,6 +78,7 @@ export default function StatsPage() {
             background:period===p.d?'rgba(0,212,255,0.08)':'var(--bg2)',
             color:period===p.d?'var(--accent)':'var(--text2)',
             fontFamily:'var(--font)',fontSize:13,fontWeight:700,cursor:'pointer',
+            transition: 'all 0.2s'
           }}>{p.l}</button>
         ))}
       </div>
@@ -113,7 +116,7 @@ export default function StatsPage() {
           <div className="card-label">Средние показатели</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
             {[{v:avgCal,l:'ккал'},{v:avgPro+'г',l:'белки'},{v:Math.round(avgWat/100)/10+'л',l:'вода'},{v:totWrk,l:'трени'}].map(s=>(
-              <div key={s.l} style={{textAlign:'center',padding:'10px 4px',background:'var(--bg3)',borderRadius:var_r,border:'1px solid var(--border)'}}>
+              <div key={s.l} style={{textAlign:'center',padding:'10px 4px',background:'var(--bg3)',borderRadius:'var(--r-sm)',border:'1px solid var(--border)'}}>
                 <div style={{fontSize:16,fontWeight:800,color:'var(--text)'}}>{s.v}</div>
                 <div style={{fontSize:10,color:'var(--text3)',marginTop:3,textTransform:'uppercase',letterSpacing:'0.5px',fontWeight:600}}>{s.l}</div>
               </div>
@@ -126,10 +129,11 @@ export default function StatsPage() {
           {CHARTS.map(c=>(
             <button key={c.key} onClick={()=>setChart(c.key)} style={{
               padding:'7px 14px',borderRadius:20,whiteSpace:'nowrap',flexShrink:0,
-              border:`1px solid ${chart===c.key?'var(--accent)':'var(--border)'}`,
-              background:chart===c.key?'rgba(0,212,255,0.08)':'var(--bg2)',
-              color:chart===c.key?'var(--accent)':'var(--text2)',
+              border:`1px solid ${chart===c.key?c.color:'var(--border)'}`,
+              background:chart===c.key?`${c.color}15`:'var(--bg2)', // Слегка подкрашиваем фон активной кнопки
+              color:chart===c.key?c.color:'var(--text2)',
               fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'var(--font)',
+              transition: 'all 0.2s'
             }}>{c.label}</button>
           ))}
         </div>
@@ -147,22 +151,23 @@ export default function StatsPage() {
                 <BarChart data={chartData} margin={{top:4,right:4,left:-20,bottom:0}}>
                   <XAxis dataKey="day" tick={{fill:'var(--text3)',fontSize:10}} axisLine={false} tickLine={false}/>
                   <YAxis tick={{fill:'var(--text3)',fontSize:10}} allowDecimals={false} axisLine={false} tickLine={false}/>
-                  <Tooltip content={<Tip unit={ac.unit}/>}/>
+                  <Tooltip cursor={{fill: 'var(--bg3)'}} content={<Tip unit={ac.unit}/>}/>
                   <Bar dataKey={ac.dataKey} fill={ac.color} radius={[6,6,0,0]} maxBarSize={24}/>
                 </BarChart>
               ) : (
                 <AreaChart data={chartData} margin={{top:4,right:4,left:-20,bottom:0}}>
                   <defs>
-                    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={ac.color} stopOpacity={0.25}/>
+                    {/* 2. Уникальный ID градиента предотвращает баг "залипания" цвета */}
+                    <linearGradient id={`color-${ac.key}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={ac.color} stopOpacity={0.35}/>
                       <stop offset="95%" stopColor={ac.color} stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="day" tick={{fill:'var(--text3)',fontSize:10}} axisLine={false} tickLine={false}/>
                   <YAxis tick={{fill:'var(--text3)',fontSize:10}} axisLine={false} tickLine={false}/>
                   <Tooltip content={<Tip unit={ac.unit}/>}/>
-                  <Area type="monotone" dataKey={ac.dataKey} stroke={ac.color} strokeWidth={2.5}
-                    fill="url(#g)" dot={{fill:ac.color,r:3,strokeWidth:0}} activeDot={{r:5,strokeWidth:0}}/>
+                  <Area type="monotone" dataKey={ac.dataKey} stroke={ac.color} strokeWidth={3}
+                    fill={`url(#color-${ac.key})`} dot={{fill:ac.color,r:3,strokeWidth:0}} activeDot={{r:5,strokeWidth:0, stroke:'var(--bg)'}}/>
                 </AreaChart>
               )}
             </ResponsiveContainer>
@@ -186,5 +191,3 @@ export default function StatsPage() {
     </>
   )
 }
-
-const var_r = 'var(--r-sm)'

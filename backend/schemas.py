@@ -115,3 +115,28 @@ class Stats(BaseModel):
 
 class GoogleAuthRequest(BaseModel):
     credential: str  # Google id_token
+
+class ChatMessage(BaseModel):
+    role: str # Ожидаем 'user' или 'assistant' из фронтенда
+    content: str
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage]
+
+
+class FoodItemBase(BaseModel):
+    name: str
+    brand: Optional[str] = ""
+    calories: int
+    protein: int
+    fat: int
+    carbs: int
+
+class FoodItemCreate(FoodItemBase):
+    pass
+
+class FoodItemResponse(FoodItemBase):
+    id: int
+
+    class Config:
+        orm_mode = True

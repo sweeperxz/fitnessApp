@@ -1,3 +1,4 @@
+import datetime
 import os, httpx
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -147,3 +148,91 @@ def delete_workout(workout_id: int, user: models.User = Depends(get_current_user
 @app.get("/stats", response_model=schemas.Stats)
 def get_stats(days: int = 30, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     return crud.get_stats(db, user.id, days)
+
+# ── AI Assistant (Gemini) ─────────────────────────────────
+@app.post("/ai/chat")
+async def ai_chat(data: schemas.ChatRequest, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise HTTPException(500, "GEMINI_API_KEY не настроен на сервере")
+
+    # 1. Получаем профиль для системного промпта
+    profile = crud.get_profile(db, user.id)
+    sys_prompt = "Ты персональный фитнес-ассистент FitFlowAI. Отвечай на русском, кратко и конкретно. уместить в maxOutputTokens: 5500,"
+    if profile:
+        sys_prompt += f" Пользователь: вес {profile.weight}кг, цель: {profile.goal}, КБЖУ цель: {profile.calories_goal}ккал, белки {profile.protein_goal}г."
+
+    # 2. Форматируем историю сообщений под стандарт Gemini
+    gemini_messages = []
+    for msg in data.messages:
+        # Gemini использует роль 'model' вместо 'assistant'
+        role = "model" if msg.role == "assistant" else "user"
+        gemini_messages.append({
+            "role": role,
+            "parts": [{"text": msg.content}]
+        })
+
+    # 3. Собираем тело запроса
+    payload = {
+        "systemInstruction": {
+            "parts": [{"text": sys_prompt}]
+        },
+        "contents": gemini_messages,
+        "generationConfig": {
+            "maxOutputTokens": 5500,
+            "temperature": 0.7 # Немного креативности, но без ухода от темы
+        }
+    }
+
+    # Используем быструю модель gemini-1.5-flash (отлично подходит для чатов)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+
+    # 4. Отправляем запрос
+    async with httpx.AsyncClient() as client:
+        try:
+            res = await client.post(url, json=payload, timeout=30.0)
+            res.raise_for_status()
+            return res.json() # Возвращаем сырой ответ Gemini на фронтенд
+        except httpx.HTTPStatusError as e:
+            # Выводим ошибку в консоль сервера для дебага
+            print(f"Gemini API Error: {e.response.text}")
+            raise HTTPException(status_code=e.response.status_code, detail="Ошибка от провайдера AI")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при обращении к AI")
+
+
+@app.get("/foods/recent", response_model=list[schemas.FoodItemResponse])
+def get_recent_foods(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Берем топ-20 последних продуктов юзера
+    foods = db.query(models.UserFood).filter(models.UserFood.user_id == user.id) \
+        .order_by(models.UserFood.last_used.desc()).limit(20).all()
+    return foods
+
+
+@app.post("/foods/recent")
+def add_recent_food(data: schemas.FoodItemCreate, user: models.User = Depends(get_current_user),
+                    db: Session = Depends(get_db)):
+    # Ищем, есть ли уже такой продукт в истории юзера (по имени и калориям, чтобы не плодить дубли)
+    existing = db.query(models.UserFood).filter(
+        models.UserFood.user_id == user.id,
+        models.UserFood.name == data.name
+    ).first()
+
+    if existing:
+        # Если есть, просто обновляем время, чтобы он поднялся наверх списка
+        existing.last_used = datetime.utcnow()
+    else:
+        # Если нет, создаем новую запись
+        new_food = models.UserFood(
+            user_id=user.id,
+            name=data.name,
+            brand=data.brand,
+            calories=data.calories,
+            protein=data.protein,
+            fat=data.fat,
+            carbs=data.carbs
+        )
+        db.add(new_food)
+
+    db.commit()
+    return {"ok": True}
