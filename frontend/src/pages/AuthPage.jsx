@@ -15,17 +15,23 @@ function loadGSI(callback) {
 }
 
 export default function AuthPage({ onAuth }) {
-  const [mode, setMode]       = useState('google')
-  const [sub,  setSub]        = useState('login')
-  const [form, setForm]       = useState({ email: '', password: '', name: '' })
+  const [mode, setMode] = useState('google')
+  const [sub, setSub] = useState('login')
+  const [form, setForm] = useState({ email: '', password: '', name: '' })
   const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState('')
-  const [gReady, setGReady]   = useState(false)
+  const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [gReady, setGReady] = useState(false)
 
   const btnRef = useRef(null)
   const wrapperRef = useRef(null) // Реф для контейнера, чтобы получить точную ширину
 
-  const upd = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const upd = (k, v) => {
+    setForm(f => ({ ...f, [k]: v }))
+    // Clear field error on change
+    if (fieldErrors[k]) setFieldErrors(fe => ({ ...fe, [k]: false }))
+    setError('')
+  }
 
   // Инициализируем Google Sign-In
   useEffect(() => {
@@ -54,10 +60,10 @@ export default function AuthPage({ onAuth }) {
   useEffect(() => {
     if (!gReady || !btnRef.current || !wrapperRef.current || !G_CLIENT_ID) return
     window.google.accounts.id.renderButton(btnRef.current, {
-      type:  'standard',
+      type: 'standard',
       theme: 'filled_black',
-      size:  'large',
-      text:  'signin_with',
+      size: 'large',
+      text: 'signin_with',
       shape: 'rectangular',
       locale: 'ru',
       // Берем ширину нашего красивого контейнера
@@ -67,9 +73,19 @@ export default function AuthPage({ onAuth }) {
 
   const submitEmail = async () => {
     setError('')
-    if (!form.email || !form.password) return setError('Заполни все поля')
-    if (sub === 'register' && !form.name) return setError('Введи имя')
-    if (sub === 'register' && form.password.length < 6) return setError('Пароль минимум 6 символов')
+    const fe = {}
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
+    if (!form.email.trim()) fe.email = true
+    else if (!emailOk) { fe.email = true; setError('Введи корректный email'); setFieldErrors(fe); return }
+    if (!form.password) fe.password = true
+    if (sub === 'register' && !form.name.trim()) fe.name = true
+    if (sub === 'register' && form.password && form.password.length < 6) {
+      fe.password = true; setError('Пароль — минимум 6 символов'); setFieldErrors(fe); return
+    }
+    if (Object.keys(fe).length) {
+      setFieldErrors(fe); setError('Заполни все обязательные поля'); return
+    }
+    setFieldErrors({})
     setLoading(true)
     try {
       const data = await (sub === 'register' ? register : login)(form)
@@ -84,7 +100,7 @@ export default function AuthPage({ onAuth }) {
       {/* Logo */}
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text)', letterSpacing: '-1px', marginBottom: 4 }}>
-          Fit<span style={{ color: 'var(--accent)' }}>Flow</span>
+          Nut<span style={{ color: 'var(--accent)' }}>rio</span>
         </div>
         <div style={{ fontSize: 13, color: 'var(--text2)' }}>Персональный фитнес-трекер</div>
       </div>
@@ -145,7 +161,7 @@ export default function AuthPage({ onAuth }) {
         <div className="tab-bar" style={{ marginBottom: 16 }}>
           {[['login', 'Войти'], ['register', 'Регистрация']].map(([m, l]) => (
             <button key={m} className={`tab-btn${sub === m ? ' active' : ''}`}
-              onClick={() => { setSub(m); setError('') }}>{l}</button>
+              onClick={() => { setSub(m); setError(''); setFieldErrors({}) }}>{l}</button>
           ))}
         </div>
 
@@ -153,7 +169,8 @@ export default function AuthPage({ onAuth }) {
           <div className="form-group">
             <div className="input-label">Имя</div>
             <input className="input" placeholder="Как тебя зовут?" value={form.name}
-              onChange={e => upd('name', e.target.value)} autoComplete="name" />
+              onChange={e => upd('name', e.target.value)} autoComplete="name"
+              style={fieldErrors.name ? { borderColor: 'var(--red)' } : {}} />
           </div>
         )}
 
@@ -161,7 +178,8 @@ export default function AuthPage({ onAuth }) {
           <div className="input-label">Email</div>
           <input className="input" type="email" inputMode="email" placeholder="you@example.com"
             value={form.email} onChange={e => upd('email', e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && submitEmail()} autoComplete="email" />
+            onKeyDown={e => e.key === 'Enter' && submitEmail()} autoComplete="email"
+            style={fieldErrors.email ? { borderColor: 'var(--red)' } : {}} />
         </div>
 
         <div className="form-group">
@@ -169,7 +187,8 @@ export default function AuthPage({ onAuth }) {
           <input className="input" type="password" placeholder="Минимум 6 символов"
             value={form.password} onChange={e => upd('password', e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submitEmail()}
-            autoComplete={sub === 'register' ? 'new-password' : 'current-password'} />
+            autoComplete={sub === 'register' ? 'new-password' : 'current-password'}
+            style={fieldErrors.password ? { borderColor: 'var(--red)' } : {}} />
         </div>
 
         {error && (

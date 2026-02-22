@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from datetime import date, datetime
 from typing import Optional, List
 
@@ -22,14 +22,14 @@ class TokenResponse(BaseModel):
 
 # ── Profile ───────────────────────────────────────────────
 class ProfileCreate(BaseModel):
-    weight: float = 70
+    weight: float = Field(default=70, ge=20, le=500)
     goal: str = "maintain"
     activity: str = "medium"
-    water_goal: int = 2500
-    calories_goal: int = 2000
-    protein_goal: int = 150
-    fat_goal: int = 70
-    carbs_goal: int = 250
+    water_goal: int = Field(default=2500, ge=500, le=10000)
+    calories_goal: int = Field(default=2000, ge=500, le=15000)
+    protein_goal: int = Field(default=150, ge=0, le=1000)
+    fat_goal: int = Field(default=70, ge=0, le=1000)
+    carbs_goal: int = Field(default=250, ge=0, le=2000)
 
 class Profile(ProfileCreate):
     id: int
@@ -41,10 +41,10 @@ class MealCreate(BaseModel):
     day: date
     meal_type: str
     name: str
-    calories: float = 0
-    protein: float = 0
-    fat: float = 0
-    carbs: float = 0
+    calories: float = Field(default=0, ge=0, le=50000)
+    protein: float = Field(default=0, ge=0, le=5000)
+    fat: float = Field(default=0, ge=0, le=5000)
+    carbs: float = Field(default=0, ge=0, le=5000)
 
 class Meal(MealCreate):
     id: int
@@ -64,7 +64,7 @@ class NutritionDay(BaseModel):
 # ── Water ─────────────────────────────────────────────────
 class WaterLogCreate(BaseModel):
     day: date
-    amount_ml: int
+    amount_ml: int = Field(ge=0, le=20000)
 
 class WaterLog(WaterLogCreate):
     id: int
@@ -75,9 +75,9 @@ class WaterLog(WaterLogCreate):
 # ── Workouts ──────────────────────────────────────────────
 class ExerciseCreate(BaseModel):
     name: str
-    sets: int = 3
-    reps: int = 10
-    weight_kg: float = 0
+    sets: int = Field(default=3, ge=1, le=100)
+    reps: int = Field(default=10, ge=1, le=1000)
+    weight_kg: float = Field(default=0, ge=0, le=1000)
 
 class Exercise(ExerciseCreate):
     id: int
@@ -139,4 +139,4 @@ class FoodItemResponse(FoodItemBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True

@@ -57,7 +57,7 @@ export default function InstallBanner() {
       <div style={{ fontSize: 28, flexShrink: 0 }}>📲</div>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-          Установить FitFlowAI
+          Установить Nutrio
         </div>
         <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>
           {isIOS

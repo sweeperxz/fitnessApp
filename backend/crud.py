@@ -101,31 +101,72 @@ def delete_workout(db: Session, workout_id: int, user_id: int):
 
 # ── Stats ─────────────────────────────────────────────────
 def get_stats(db: Session, user_id: int, days: int = 30) -> schemas.Stats:
+    # Clamp days to sane range to prevent abuse
+    days = max(1, min(days, 365))
     today = date.today()
+    start = today - timedelta(days=days - 1)
+
+    # 1 query: aggregate meals by day
+    from sqlalchemy import func as sqfunc
+    meal_rows = db.query(
+        models.Meal.day,
+        sqfunc.sum(models.Meal.calories).label("cal"),
+        sqfunc.sum(models.Meal.protein).label("pro"),
+        sqfunc.sum(models.Meal.fat).label("fat"),
+        sqfunc.sum(models.Meal.carbs).label("carb"),
+    ).filter(
+        models.Meal.user_id == user_id,
+        models.Meal.day >= start,
+        models.Meal.day <= today,
+    ).group_by(models.Meal.day).all()
+
+    meal_map = {r.day: r for r in meal_rows}
+
+    # 1 query: aggregate water by day
+    water_rows = db.query(
+        models.WaterLog.day,
+        sqfunc.sum(models.WaterLog.amount_ml).label("ml"),
+    ).filter(
+        models.WaterLog.user_id == user_id,
+        models.WaterLog.day >= start,
+        models.WaterLog.day <= today,
+    ).group_by(models.WaterLog.day).all()
+
+    water_map = {r.day: r.ml or 0 for r in water_rows}
+
+    # 1 query: count workouts by day
+    workout_rows = db.query(
+        models.Workout.day,
+        sqfunc.count(models.Workout.id).label("cnt"),
+    ).filter(
+        models.Workout.user_id == user_id,
+        models.Workout.day >= start,
+        models.Workout.day <= today,
+    ).group_by(models.Workout.day).all()
+
+    workout_map = {r.day: r.cnt for r in workout_rows}
+
+    # Build daily stats from the 3 result maps
     day_stats = []
     streak = 0
     streak_active = True
 
     for i in range(days - 1, -1, -1):
         d = today - timedelta(days=i)
-        meals = db.query(models.Meal).filter(
-            models.Meal.user_id == user_id, models.Meal.day == d).all()
-        water = db.query(models.WaterLog).filter(
-            models.WaterLog.user_id == user_id, models.WaterLog.day == d).all()
-        workouts = db.query(models.Workout).filter(
-            models.Workout.user_id == user_id, models.Workout.day == d).count()
+        m = meal_map.get(d)
+        cal = float(m.cal or 0) if m else 0.0
 
-        cal = sum(m.calories for m in meals)
         day_stats.append(schemas.DayStats(
-            day=d, calories=cal,
-            protein=sum(m.protein for m in meals),
-            fat=sum(m.fat for m in meals),
-            carbs=sum(m.carbs for m in meals),
-            water_ml=sum(w.amount_ml for w in water),
-            workout_count=workouts,
+            day=d,
+            calories=cal,
+            protein=float(m.pro or 0) if m else 0.0,
+            fat=float(m.fat or 0) if m else 0.0,
+            carbs=float(m.carb or 0) if m else 0.0,
+            water_ml=water_map.get(d, 0),
+            workout_count=workout_map.get(d, 0),
         ))
 
-        if streak_active and i <= days - 1:
+        if streak_active:
             if cal > 0:
                 streak += 1
             elif i != 0:

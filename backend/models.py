@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, func
+from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, Index, func
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -14,6 +14,7 @@ class User(Base):
     meals    = relationship("Meal",    back_populates="user", cascade="all, delete")
     waters   = relationship("WaterLog", back_populates="user", cascade="all, delete")
     workouts = relationship("Workout", back_populates="user", cascade="all, delete")
+    foods    = relationship("UserFood", back_populates="user", cascade="all, delete")
 
 class Profile(Base):
     __tablename__ = "profiles"
@@ -32,11 +33,14 @@ class Profile(Base):
 
 class Meal(Base):
     __tablename__ = "meals"
+    __table_args__ = (
+        Index('ix_meals_user_day', 'user_id', 'day'),
+    )
     id         = Column(Integer, primary_key=True)
     user_id    = Column(Integer, ForeignKey("users.id"), index=True)
-    day        = Column(Date)
-    meal_type  = Column(String)
-    name       = Column(String)
+    day        = Column(Date, nullable=False)
+    meal_type  = Column(String, nullable=False)
+    name       = Column(String, nullable=False)
     calories   = Column(Float, default=0)
     protein    = Column(Float, default=0)
     fat        = Column(Float, default=0)
@@ -47,19 +51,25 @@ class Meal(Base):
 
 class WaterLog(Base):
     __tablename__ = "water_logs"
+    __table_args__ = (
+        Index('ix_water_user_day', 'user_id', 'day'),
+    )
     id         = Column(Integer, primary_key=True)
     user_id    = Column(Integer, ForeignKey("users.id"), index=True)
-    day        = Column(Date)
-    amount_ml  = Column(Integer)
+    day        = Column(Date, nullable=False)
+    amount_ml  = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=func.now())
 
     user = relationship("User", back_populates="waters")
 
 class Workout(Base):
     __tablename__ = "workouts"
+    __table_args__ = (
+        Index('ix_workouts_user_day', 'user_id', 'day'),
+    )
     id         = Column(Integer, primary_key=True)
     user_id    = Column(Integer, ForeignKey("users.id"), index=True)
-    day        = Column(Date)
+    day        = Column(Date, nullable=False)
     title      = Column(String, default="Тренировка")
     notes      = Column(String, default="")
     created_at = Column(DateTime, default=func.now())
@@ -83,7 +93,7 @@ class UserFood(Base):
     __tablename__ = "user_foods"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
     name = Column(String, index=True)
     brand = Column(String, nullable=True)
     calories = Column(Integer)
@@ -91,3 +101,5 @@ class UserFood(Base):
     fat = Column(Integer)
     carbs = Column(Integer)
     last_used = Column(DateTime, default=func.now())
+
+    user = relationship("User", back_populates="foods")

@@ -1,10 +1,11 @@
-import datetime
-import os, httpx
+import os
+from datetime import date, datetime
+from typing import Optional
+
+import httpx
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from datetime import date
-from typing import Optional
 from google.oauth2 import id_token
 from google.auth.transport import requests as g_requests
 
@@ -20,17 +21,18 @@ from auth import get_db, get_current_user, hash_password, verify_password, creat
 
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="FitFlowAI API", version="2.1.0")
+app = FastAPI(title="Nutrio API", version="2.1.0")
 
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in cors_origins] + ["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[o.strip() for o in cors_origins],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 # ── Health ────────────────────────────────────────────────
 @app.get("/health")
@@ -60,14 +62,9 @@ def login(data: schemas.LoginRequest, db: Session = Depends(get_db)):
 def google_auth(data: schemas.GoogleAuthRequest, db: Session = Depends(get_db)):
     """Принимает id_token от Google Sign-In и возвращает наш JWT"""
     try:
-        if GOOGLE_CLIENT_ID:
-            info = id_token.verify_oauth2_token(data.credential, g_requests.Request(), GOOGLE_CLIENT_ID)
-        else:
-            # Dev mode: decode without verification (только для разработки!)
-            import json, base64
-            payload = data.credential.split('.')[1]
-            payload += '=' * (4 - len(payload) % 4)
-            info = json.loads(base64.urlsafe_b64decode(payload))
+        if not GOOGLE_CLIENT_ID:
+            raise HTTPException(500, "Google OAuth не настроен: задайте GOOGLE_CLIENT_ID")
+        info = id_token.verify_oauth2_token(data.credential, g_requests.Request(), GOOGLE_CLIENT_ID)
         
         email = info.get("email", "").lower()
         name  = info.get("name", "")
@@ -158,7 +155,7 @@ async def ai_chat(data: schemas.ChatRequest, user: models.User = Depends(get_cur
 
     # 1. Получаем профиль для системного промпта
     profile = crud.get_profile(db, user.id)
-    sys_prompt = "Ты персональный фитнес-ассистент FitFlowAI. Отвечай на русском, кратко и конкретно. уместить в maxOutputTokens: 5500,"
+    sys_prompt = "Ты персональный фитнес-ассистент Nutrio. Отвечай на русском, кратко и конкретно. уместить в maxOutputTokens: 5500,"
     if profile:
         sys_prompt += f" Пользователь: вес {profile.weight}кг, цель: {profile.goal}, КБЖУ цель: {profile.calories_goal}ккал, белки {profile.protein_goal}г."
 
@@ -185,12 +182,13 @@ async def ai_chat(data: schemas.ChatRequest, user: models.User = Depends(get_cur
     }
 
     # Используем быструю модель gemini-1.5-flash (отлично подходит для чатов)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
     # 4. Отправляем запрос
+    headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
     async with httpx.AsyncClient() as client:
         try:
-            res = await client.post(url, json=payload, timeout=30.0)
+            res = await client.post(url, json=payload, headers=headers, timeout=30.0)
             res.raise_for_status()
             return res.json() # Возвращаем сырой ответ Gemini на фронтенд
         except httpx.HTTPStatusError as e:

@@ -124,7 +124,7 @@ export default function TodayPage() {
     <>
       {/* Заголовок + навигация по дням */}
       <div className="page-header">
-        <div className="page-title">Fit<span>Flow</span></div>
+        <div className="page-title">Nut<span>rio</span></div>
         <div className="date-nav">
           <button className="date-nav-btn" onClick={() => setDay(d => d.subtract(1, 'day'))}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
@@ -137,11 +137,19 @@ export default function TodayPage() {
       </div>
 
       {/* Калории + макросы */}
-      <div className="card">
+      <div className="card" style={{ '--i': 0 }}>
         {!data
           ? (
-            <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div className="spin" style={{ width: 24, height: 24, border: '2px solid var(--bg4)', borderTopColor: 'var(--blue)', borderRadius: '50%' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div className="skeleton skeleton-circle" style={{ width: 118, height: 118, flexShrink: 0 }} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 8 }}>
+                  <div className="skeleton skeleton-line" style={{ width: '80%' }} />
+                  <div className="skeleton skeleton-line" style={{ width: '60%' }} />
+                  <div className="skeleton skeleton-line" style={{ width: '70%' }} />
+                </div>
+              </div>
+              <div className="skeleton skeleton-line" style={{ height: 16, width: '100%' }} />
             </div>
           ) : (
             <>
@@ -155,7 +163,7 @@ export default function TodayPage() {
                         <span className="macro-val">{Math.round(m.v)}<span>/{m.g}г</span></span>
                       </div>
                       <div className="macro-track">
-                        <div className="macro-fill" style={{ width: Math.min((m.v / m.g) * 100, 100) + '%', background: m.c }} />
+                        <div className="macro-fill" style={{ '--fill-w': Math.min((m.v / m.g) * 100, 100) + '%', background: m.c }} />
                       </div>
                     </div>
                   ))}
@@ -182,14 +190,14 @@ export default function TodayPage() {
       </div>
 
       {/* Вода */}
-      <div className="card">
+      <div className="card" style={{ '--i': 1 }}>
         <div className="card-label">Вода</div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
           <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1 }}>{d.water_ml}</span>
           <span style={{ fontSize: 13, color: 'var(--text2)' }}>/ {pr.water_goal} мл</span>
         </div>
         <div className="water-track">
-          <div className="water-fill" style={{ width: waterPct + '%' }} />
+          <div className="water-fill" style={{ '--fill-w': waterPct + '%' }} />
         </div>
         <div className="water-btns">
           {[100, 200, 250, 500].map(ml => (
@@ -236,7 +244,7 @@ export default function TodayPage() {
       </div>
 
       {/* Приёмы пищи */}
-      <div className="card">
+      <div className="card" style={{ '--i': 2 }}>
         <div className="card-label">Приёмы пищи</div>
         {groups.length === 0
           ? (

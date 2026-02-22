@@ -1,4 +1,4 @@
-const CACHE = 'fitflow-v2'
+const CACHE = 'nutrio-v2'
 const STATIC = ['/', '/index.html']
 
 self.addEventListener('install', e => {

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import SearchTab from './SearchTab'
 import BarcodeTab from './BarcodeTab'
 import ManualTab from './ManualTab'
@@ -16,7 +17,7 @@ export default function AddModal({ onClose, onAdd }) {
         setTab(2)
     }
 
-    return (
+    return createPortal(
         <div className="modal-backdrop" onClick={onClose}>
             <div
                 className="modal"
@@ -41,7 +42,7 @@ export default function AddModal({ onClose, onAdd }) {
                 <div style={{
                     overflowY: 'auto', flex: 1,
                     WebkitOverflowScrolling: 'touch',
-                    paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 80px)', /* Увеличен отступ для Safari-бара */
+                    paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 80px)',
                 }}>
                     {tab === 0 && <SearchTab onSelect={pick} />}
                     {tab === 1 && <BarcodeTab onSelect={pick} />}
@@ -61,6 +62,7 @@ export default function AddModal({ onClose, onAdd }) {
                     {tab === 3 && <AiTab onSelect={pick} />}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }

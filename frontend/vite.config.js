@@ -8,10 +8,10 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'FitFlowAI',
-        short_name: 'FitFlow',
-        description: 'Персональный фитнес-трекер',
-        theme_color: '#0a0a0a',
+        name: 'Nutrio',
+        short_name: 'Nutrio',
+        description: 'Удобный трекер калорий и тренировок',
+        theme_color: '#080b14',
         background_color: '#0a0a0a',
         display: 'standalone',
         orientation: 'portrait',
