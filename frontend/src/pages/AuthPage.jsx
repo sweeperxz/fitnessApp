@@ -100,7 +100,7 @@ export default function AuthPage({ onAuth }) {
       {/* Logo */}
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text)', letterSpacing: '-1px', marginBottom: 4 }}>
-          Nut<span style={{ color: 'var(--accent)' }}>rio</span>
+          Nut<span style={{ color: 'var(--blue)' }}>rio</span>
         </div>
         <div style={{ fontSize: 13, color: 'var(--text2)' }}>Персональный фитнес-трекер</div>
       </div>
@@ -151,9 +151,9 @@ export default function AuthPage({ onAuth }) {
           </>
         ) : (
           <div style={{ padding: '12px 14px', borderRadius: 8, marginBottom: 16, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
-            <strong style={{ color: 'var(--accent)' }}>Google Sign-In не настроен.</strong><br />
+            <strong style={{ color: 'var(--amber)' }}>Google Sign-In не настроен.</strong><br />
             Добавь в <code>.env</code> файл:<br />
-            <code style={{ color: 'var(--accent)' }}>VITE_GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com</code>
+            <code style={{ color: 'var(--amber)' }}>VITE_GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com</code>
           </div>
         )}
 

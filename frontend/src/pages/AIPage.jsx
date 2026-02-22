@@ -77,7 +77,7 @@ export default function AIPage() {
                                     width: 56,
                                     height: 56,
                                     borderRadius: 18,
-                                    background: 'linear-gradient(135deg,var(--accent2),var(--accent))',
+                                    background: 'linear-gradient(135deg,var(--blue2),var(--blue))',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
@@ -126,7 +126,7 @@ export default function AIPage() {
                                 {m.role === 'assistant' && (
                                     <div className="bubble-avatar">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                            stroke="var(--accent)" strokeWidth={2} strokeLinecap="round">
+                                            stroke="var(--blue)" strokeWidth={2} strokeLinecap="round">
                                             <circle cx="12" cy="12" r="3" />
                                             <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
                                         </svg>
@@ -146,7 +146,7 @@ export default function AIPage() {
                         {loading && (
                             <div className="bubble-wrap">
                                 <div className="bubble-avatar">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)"
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--blue)"
                                         strokeWidth={2} strokeLinecap="round">
                                         <circle cx="12" cy="12" r="3" />
                                         <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />

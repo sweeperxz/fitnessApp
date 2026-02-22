@@ -47,8 +47,8 @@ export default function InstallBanner() {
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200,
-      background: 'linear-gradient(135deg, #1a1200, #141414)',
-      borderBottom: '1px solid rgba(255,184,0,0.3)',
+      background: 'var(--bg2)',
+      borderBottom: '1px solid var(--border)',
       padding: '12px 16px',
       display: 'flex', alignItems: 'center', gap: 12,
       animation: 'slideDown 0.3s ease',
@@ -68,9 +68,9 @@ export default function InstallBanner() {
       </div>
       {!isIOS && (
         <button onClick={install} style={{
-          background: 'var(--accent)', color: '#000', border: 'none',
+          background: 'var(--blue)', color: '#fff', border: 'none',
           borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 700,
-          cursor: 'pointer', flexShrink: 0, fontFamily: 'var(--font-body)'
+          cursor: 'pointer', flexShrink: 0, fontFamily: 'var(--font)'
         }}>
           Установить
         </button>

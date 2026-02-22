@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react'
-import { Html5Qrcode } from 'html5-qrcode'
+import React, { useEffect, useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 
 /**
  * BarcodeScanner — fullscreen камера-сканер
@@ -10,6 +11,8 @@ import { Html5Qrcode } from 'html5-qrcode'
 export default function BarcodeScanner({ onResult, onClose }) {
   const [status, setStatus] = useState('starting') // starting | scanning | error
   const [errMsg, setErrMsg] = useState('')
+  const onResultRef = useRef(onResult)
+  useEffect(() => { onResultRef.current = onResult }, [onResult])
 
   useEffect(() => {
     let html5QrCode = null
@@ -33,19 +36,16 @@ export default function BarcodeScanner({ onResult, onClose }) {
 
         // 3. Настройки сканера для оптимального баланса скорости и производительности
         const config = {
-          fps: 10, // 10 кадров в секунду достаточно для быстрого скана, экономит батарею
-          qrbox: { width: 280, height: 160 }, // Прямоугольник удобен для штрихкодов
-          aspectRatio: window.innerWidth / window.innerHeight,
+          fps: 10, // Возвращаем 10 FPS (20 может перегружать процессор на телефонах)
+          qrbox: { width: 280, height: 160 }, // Вернули широкий прямоугольник для EAN штрихкодов
           formatsToSupport: [
-            0,  // QR_CODE
-            8,  // EAN_13 (Самый частый формат продуктов)
-            7,  // EAN_8
-            14, // UPC_A
-            15, // UPC_E
-            3,  // CODE_39
-            4,  // CODE_93
-            5,  // CODE_128
-            11, // ITF
+            Html5QrcodeSupportedFormats.EAN_13, // Самый частый формат продуктов
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
           ],
         }
 
@@ -62,10 +62,10 @@ export default function BarcodeScanner({ onResult, onClose }) {
 
             // Останавливаем сканер перед возвратом результата, чтобы не было двойных срабатываний
             html5QrCode.stop().then(() => {
-              if (isMounted) onResult(decodedText)
+              if (isMounted) onResultRef.current(decodedText)
             }).catch(() => {
               // Если стоп не удался, всё равно возвращаем результат
-              if (isMounted) onResult(decodedText)
+              if (isMounted) onResultRef.current(decodedText)
             })
           },
           (errorMessage) => {
@@ -102,12 +102,12 @@ export default function BarcodeScanner({ onResult, onClose }) {
         html5QrCode.stop().catch(err => console.error('Failed to stop scanner on unmount', err))
       }
     }
-  }, [onResult])
+  }, [])
 
 
-  return (
+  return createPortal(
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
+      position: 'fixed', inset: 0, zIndex: 99999, // Ensure it's above everything including the modal
       background: '#000',
       display: 'flex', flexDirection: 'column',
     }}>
@@ -234,6 +234,7 @@ export default function BarcodeScanner({ onResult, onClose }) {
         </div>
       )}
 
-    </div>
+    </div>,
+    document.body
   )
 }

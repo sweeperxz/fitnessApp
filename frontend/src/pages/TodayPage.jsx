@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import ReactDOM from 'react-dom'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
 import {
   getNutritionDay, addMeal, deleteMeal,
   logWater, getProfile, sendChatMessage,
 } from '../api'
+import { tapHaptic, mediumHaptic, successHaptic } from '../utils/haptic'
 import { MEAL_TYPES, MealIcons } from '../utils/constants'
 import Ring from '../components/Ring'
 import AddModal from '../components/AddMeal/AddModal'
@@ -64,15 +66,18 @@ export default function TodayPage() {
       ? 'Вчера'
       : day.format('D MMMM')
 
-  const groups = MEAL_TYPES
-    .map(t => ({ type: t, items: d.meals.filter(m => m.meal_type === t) }))
-    .filter(g => g.items.length > 0)
+  const groups = useMemo(() =>
+    MEAL_TYPES
+      .map(t => ({ type: t, items: d.meals.filter(m => m.meal_type === t) }))
+      .filter(g => g.items.length > 0),
+    [d.meals]
+  )
 
-  const macros = [
+  const macros = useMemo(() => [
     { l: 'Белки', v: d.total_protein, g: pr.protein_goal, c: 'var(--purple)' },
     { l: 'Жиры', v: d.total_fat, g: pr.fat_goal, c: 'var(--amber)' },
     { l: 'Углев.', v: d.total_carbs, g: pr.carbs_goal, c: 'var(--blue)' },
-  ]
+  ], [d.total_protein, d.total_fat, d.total_carbs, pr.protein_goal, pr.fat_goal, pr.carbs_goal])
 
   const loadAiTips = async () => {
     if (aiTips || tipsLoading) return
@@ -126,11 +131,11 @@ export default function TodayPage() {
       <div className="page-header">
         <div className="page-title">Nut<span>rio</span></div>
         <div className="date-nav">
-          <button className="date-nav-btn" onClick={() => setDay(d => d.subtract(1, 'day'))}>
+          <button className="date-nav-btn" onClick={() => { tapHaptic(); setDay(d => d.subtract(1, 'day')) }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
           </button>
           <span className="date-nav-label">{dayLabel}</span>
-          <button className="date-nav-btn" onClick={() => setDay(d => d.add(1, 'day'))}>
+          <button className="date-nav-btn" onClick={() => { tapHaptic(); setDay(d => d.add(1, 'day')) }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M9 18l6-6-6-6" /></svg>
           </button>
         </div>
@@ -202,7 +207,7 @@ export default function TodayPage() {
         <div className="water-btns">
           {[100, 200, 250, 500].map(ml => (
             <button key={ml} className="water-btn"
-              onClick={() => logWater({ day: day.format('YYYY-MM-DD'), amount_ml: ml }).then(load)}>
+              onClick={() => { tapHaptic(); logWater({ day: day.format('YYYY-MM-DD'), amount_ml: ml }).then(load) }}>
               +{ml}
             </button>
           ))}
@@ -277,7 +282,7 @@ export default function TodayPage() {
                     <div className="meal-name">{m.name}</div>
                     <div className="meal-macro">Б:{m.protein}г · Ж:{m.fat}г · У:{m.carbs}г · <span className="meal-cal">{m.calories} ккал</span></div>
                   </div>
-                  <button className="meal-del" onClick={() => deleteMeal(m.id).then(load)}>
+                  <button className="meal-del" onClick={() => { mediumHaptic(); deleteMeal(m.id).then(load) }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
                       <path d="M18 6 6 18M6 6l12 12" />
                     </svg>
@@ -289,19 +294,25 @@ export default function TodayPage() {
         }
       </div>
 
-      {/* FAB */}
-      <button className="fab" onClick={() => setModal(true)}>
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </button>
-
-      {/* Модалка */}
-      {modal && (
-        <AddModal
-          onClose={() => setModal(false)}
-          onAdd={meal => addMeal({ ...meal, day: day.format('YYYY-MM-DD') }).then(load)}
-        />
+      {/* FAB + Modal — portaled to body so transform on .page doesn't break position:fixed */}
+      {ReactDOM.createPortal(
+        <>
+          <button className="fab" onClick={() => { mediumHaptic(); setModal(true) }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
+          {modal && (
+            <AddModal
+              onClose={() => setModal(false)}
+              onAdd={meal => {
+                successHaptic()
+                return addMeal({ ...meal, day: day.format('YYYY-MM-DD') }).then(load)
+              }}
+            />
+          )}
+        </>,
+        document.body
       )}
     </>
   )

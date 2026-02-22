@@ -86,17 +86,17 @@ export default function StatsPage() {
 
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-          <div style={{ width: 32, height: 32, border: '2.5px solid var(--bg3)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          <div style={{ width: 32, height: 32, border: '2.5px solid var(--bg3)', borderTopColor: 'var(--blue)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
         </div>
       ) : <>
         {/* Top stats */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
           <div className="card" style={{ margin: 0 }}>
             <div className="card-label">Активных дней</div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}>{active.length}<span style={{ fontSize: 16, color: 'var(--text2)', fontWeight: 500 }}>/{period}</span></div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--blue)', lineHeight: 1 }}>{active.length}<span style={{ fontSize: 16, color: 'var(--text2)', fontWeight: 500 }}>/{period}</span></div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 10 }}>
               {days.map((d, i) => (
-                <div key={i} style={{ width: 9, height: 9, borderRadius: 2, background: d.calories > 0 ? 'var(--accent)' : 'var(--bg4)', transition: 'background 0.3s' }} />
+                <div key={i} style={{ width: 9, height: 9, borderRadius: 2, background: d.calories > 0 ? 'var(--blue)' : 'var(--bg4)', transition: 'background 0.3s' }} />
               ))}
             </div>
           </div>
@@ -179,7 +179,7 @@ export default function StatsPage() {
         <div className="card">
           <div className="card-label">Серия</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ fontSize: 52, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}>{stats?.streak || 0}</div>
+            <div style={{ fontSize: 52, fontWeight: 800, color: 'var(--blue)', lineHeight: 1 }}>{stats?.streak || 0}</div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 700 }}>дней подряд</div>
               <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4, lineHeight: 1.4 }}>

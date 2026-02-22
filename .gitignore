@@ -274,3 +274,8 @@ cython_debug/
 
 # PostgreSQL Docker
 pgdata/
+
+
+.agent/
+.agents/
+skills-lock.json

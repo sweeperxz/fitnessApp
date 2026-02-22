@@ -70,8 +70,15 @@ def get_workouts(db: Session, user_id: int, from_date=None, to_date=None):
     return q.order_by(models.Workout.day.desc()).all()
 
 def create_workout(db: Session, user_id: int, data: schemas.WorkoutCreate):
-    w = models.Workout(user_id=user_id, **data.model_dump())
+    exercises_data = data.exercises
+    workout_dict = data.model_dump(exclude={'exercises'})
+    w = models.Workout(user_id=user_id, **workout_dict)
     db.add(w)
+    db.flush()  # get w.id without committing yet
+    if exercises_data:
+        for ex_data in exercises_data:
+            ex = models.Exercise(workout_id=w.id, **ex_data.model_dump())
+            db.add(ex)
     db.commit()
     db.refresh(w)
     return w

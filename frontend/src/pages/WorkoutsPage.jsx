@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
-import { getWorkouts, createWorkout, addExercise, deleteWorkout } from '../api'
+import { getWorkouts, createWorkout, deleteWorkout } from '../api'
+import { tapHaptic, mediumHaptic, successHaptic } from '../utils/haptic'
 
 dayjs.locale('ru')
 
@@ -88,10 +89,16 @@ function NewWorkoutSheet({ onClose, onSave, day }) {
   const save = async () => {
     setSaving(true)
     try {
-      const w = await onSave({ title, day: day.format('YYYY-MM-DD'), notes })
-      for (const ex of exercises.filter(e => e.name.trim())) {
-        await addExercise(w.id, { name: ex.name, sets: +ex.sets, reps: +ex.reps, weight_kg: +ex.weight_kg })
-      }
+      const validExercises = exercises
+        .filter(e => e.name.trim())
+        .map(ex => ({ name: ex.name, sets: +ex.sets, reps: +ex.reps, weight_kg: +ex.weight_kg }))
+
+      await onSave({
+        title,
+        day: day.format('YYYY-MM-DD'),
+        notes,
+        exercises: validExercises.length > 0 ? validExercises : undefined,
+      })
       onClose()
     } finally { setSaving(false) }
   }
@@ -171,7 +178,7 @@ export default function WorkoutsPage() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         {[{ v: workouts.length, l: 'тренировок' }, { v: totSets, l: 'подходов' }, { v: totTons.toFixed(1) + 'т', l: 'объём' }].map(s => (
           <div key={s.l} className="card" style={{ flex: 1, margin: 0, textAlign: 'center', padding: '12px 8px' }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{s.v}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--blue)' }}>{s.v}</div>
             <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>{s.l}</div>
           </div>
         ))}
@@ -180,17 +187,17 @@ export default function WorkoutsPage() {
       {/* Week picker */}
       <div className="card">
         <div className="week-nav">
-          <button className="week-nav-btn" onClick={() => setWeek(w => w.subtract(1, 'week'))}>
+          <button className="week-nav-btn" onClick={() => { tapHaptic(); setWeek(w => w.subtract(1, 'week')) }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
           </button>
           <span className="week-label">{wd[0].format('D')} – {wd[6].format('D MMM')}</span>
-          <button className="week-nav-btn" onClick={() => setWeek(w => w.add(1, 'week'))}>
+          <button className="week-nav-btn" onClick={() => { tapHaptic(); setWeek(w => w.add(1, 'week')) }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M9 18l6-6-6-6" /></svg>
           </button>
         </div>
         <div className="week-strip">
           {wd.map(d => (
-            <div key={d.format('D')} className={`week-day${d.isSame(day, 'day') ? ' active' : ''}`} onClick={() => setDay(d)}>
+            <div key={d.format('D')} className={`week-day${d.isSame(day, 'day') ? ' active' : ''}`} onClick={() => { tapHaptic(); setDay(d) }}>
               <div className="week-day-name">{d.format('dd').toUpperCase()}</div>
               <div className="week-day-num">{d.format('D')}</div>
               {hasWo(d) && <div className="week-dot" />}
@@ -216,7 +223,7 @@ export default function WorkoutsPage() {
               <div className="workout-card-title">{w.title}</div>
               {w.notes && <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 3 }}>{w.notes}</div>}
             </div>
-            <button className="workout-card-del" onClick={() => deleteWorkout(w.id).then(load)}>
+            <button className="workout-card-del" onClick={() => { mediumHaptic(); deleteWorkout(w.id).then(load) }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
             </button>
           </div>
@@ -232,10 +239,15 @@ export default function WorkoutsPage() {
         </div>
       ))}
 
-      <button className="fab" onClick={() => setModal(true)}>
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
-      </button>
-      {modal && <NewWorkoutSheet onClose={() => setModal(false)} onSave={d => createWorkout(d).then(w => { load(); return w })} day={day} />}
+      {createPortal(
+        <>
+          <button className="fab" onClick={() => { mediumHaptic(); setModal(true) }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+          </button>
+          {modal && <NewWorkoutSheet onClose={() => setModal(false)} onSave={d => { successHaptic(); return createWorkout(d).then(w => { load(); return w }) }} day={day} />}
+        </>,
+        document.body
+      )}
     </>
   )
 }

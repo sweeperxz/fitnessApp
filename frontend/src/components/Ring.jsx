@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 
-export default function Ring({ eaten, goal }) {
+const Ring = React.memo(function Ring({ eaten, goal }) {
     const [anim, setAnim] = useState(0)
     useEffect(() => {
         const t = setTimeout(() => setAnim(eaten), 60)
@@ -10,7 +10,7 @@ export default function Ring({ eaten, goal }) {
     const r = 52, circ = 2 * Math.PI * r
     const ratio = goal > 0 ? anim / goal : 0
     const dash = Math.min(ratio, 1) * circ
-    const color = ratio >= 1 ? '#ef4444' : ratio > 0.85 ? '#f59e0b' : '#3b82f6'
+    const color = ratio >= 1 ? 'var(--red)' : ratio > 0.85 ? 'var(--amber)' : 'var(--blue)'
 
     return (
         <div style={{ position: 'relative', width: 120, height: 120, flexShrink: 0 }}>
@@ -28,4 +28,6 @@ export default function Ring({ eaten, goal }) {
             </div>
         </div>
     )
-}
+})
+
+export default Ring

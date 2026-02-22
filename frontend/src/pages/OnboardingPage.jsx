@@ -128,7 +128,7 @@ export default function OnboardingPage({ onDone }) {
           <div className="ob-desc">Персональные цели на основе твоих данных:</div>
           {goals && (
             <div className="card" style={{ marginBottom: 24 }}>
-              {[{ l: 'Калории', v: goals.calories_goal + ' ккал/день', c: 'var(--accent)' }, { l: 'Белки', v: goals.protein_goal + 'г', c: 'var(--accent2)' }, { l: 'Жиры', v: goals.fat_goal + 'г', c: 'var(--yellow)' }, { l: 'Углеводы', v: goals.carbs_goal + 'г', c: 'var(--accent3)' }, { l: 'Вода', v: goals.water_goal + ' мл', c: 'var(--text)' }].map(r => (
+              {[{ l: 'Калории', v: goals.calories_goal + ' ккал/день', c: 'var(--blue)' }, { l: 'Белки', v: goals.protein_goal + 'г', c: 'var(--purple)' }, { l: 'Жиры', v: goals.fat_goal + 'г', c: 'var(--amber)' }, { l: 'Углеводы', v: goals.carbs_goal + 'г', c: 'var(--green)' }, { l: 'Вода', v: goals.water_goal + ' мл', c: 'var(--text)' }].map(r => (
                 <div key={r.l} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 0', borderBottom: '1px solid var(--border)' }}>
                   <span style={{ color: 'var(--text2)', fontSize: 14 }}>{r.l}</span>
                   <span style={{ fontWeight: 800, fontSize: 14, color: r.c }}>{r.v}</span>

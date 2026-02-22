@@ -88,6 +88,7 @@ class WorkoutCreate(BaseModel):
     day: date
     title: str = "Тренировка"
     notes: str = ""
+    exercises: Optional[List[ExerciseCreate]] = None
 
 class Workout(WorkoutCreate):
     id: int

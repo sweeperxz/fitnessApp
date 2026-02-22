@@ -45,6 +45,44 @@
     /* Inputs, chips, small buttons */
 }
 
+/* ─── Light Theme Palette ───────────────────────────────── */
+[data-theme="light"] {
+    --bg: #f2f2f7;
+    /* Classic iOS app background */
+    --bg2: #ffffff;
+    /* Pure white cards */
+    --bg3: #e5e5ea;
+    /* Search bars, settings backgrounds */
+    --bg4: #d1d1d6;
+    /* Hover states */
+    --border: rgba(60, 60, 67, 0.12);
+    /* Apple system separator */
+
+    --blue: #007aff;
+    /* Apple System Blue */
+    --blue2: #0056b3;
+    /* Active states */
+    --blue-glow: rgba(0, 122, 255, 0.12);
+
+    --green: #34c759;
+    /* Vibrant Apple Green */
+    --red: #ff3b30;
+    /* Apple Red */
+    --amber: #ff9500;
+    /* Apple Orange */
+    --purple: #af52de;
+    /* Apple Purple */
+
+    --text: #000000;
+    /* Pure black */
+    --text-dim: #3c3c43;
+    /* Secondary text */
+    --text2: rgba(60, 60, 67, 0.6);
+    /* Tertiary text */
+    --text3: rgba(60, 60, 67, 0.3);
+    /* Placeholders */
+}
+
 /* ─── Root reset ────────────────────────────────────────── */
 *,
 *::before,
@@ -86,8 +124,7 @@ body {
     height: 100dvh;
     min-height: -webkit-fill-available;
     width: 100%;
-    background: #000;
-    /* Eliminate any glow bleed on sides by explicitly setting full-coverage black */
+    background: var(--bg);
     box-shadow: none;
     outline: none;
 }
@@ -301,20 +338,6 @@ textarea.input {
     opacity: 0.35;
 }
 
-.btn-outline {
-    background: var(--bg3);
-    color: var(--text2);
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    padding: 12px 20px;
-    font-size: 14px;
-    cursor: pointer;
-    width: 100%;
-    font-family: var(--font);
-    font-weight: 600;
-    -webkit-appearance: none;
-    appearance: none;
-}
 
 .btn-outline {
     background: var(--bg3);
@@ -822,12 +845,7 @@ textarea.input {
     flex-shrink: 0;
 }
 
-.bubble {
-    max-width: 80%;
-    padding: 10px 13px;
-    font-size: 14px;
-    line-height: 1.5;
-}
+
 
 .bubble.ai {
     background: var(--bg3);
@@ -1000,17 +1018,7 @@ textarea.input {
     margin-bottom: 20px;
 }
 
-.ob-card {
-    background: var(--bg2);
-    border: 1.5px solid var(--border);
-    border-radius: var(--r);
-    padding: 14px;
-    cursor: pointer;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
+
 
 .ob-card.active {
     border-color: var(--blue);
