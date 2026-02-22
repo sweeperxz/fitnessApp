@@ -1,30 +1,54 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-/* ─── Tokens ────────────────────────────────────────────── */
+/* ─── Tokens (Hevy-inspired Aesthetic) ────────────── */
 :root {
-    --bg: #080b14;
-    --bg2: #0e1220;
-    --bg3: #141929;
-    --bg4: #1b2035;
-    --border: #1e2540;
-    --blue: #3b82f6;
-    --blue2: #60a5fa;
-    --green: #22c55e;
-    --red: #ef4444;
-    --amber: #f59e0b;
-    --text: #e2e8f8;
-    --text2: #64748b;
-    --text3: #2d3654;
+    --bg: #000000;
+    /* Pure black base */
+    --bg2: #141414;
+    /* Elevated surfaces (Cards, Nav) */
+    --bg3: #1e1e1e;
+    /* Floating elements (Inputs, Search) */
+    --bg4: #2a2a2a;
+    /* Hover states, Disabled elements */
+    --border: #2c2c2e;
+    /* Clean, distinct borders */
+
+    --blue: #2563eb;
+    /* Primary brand color, Main buttons */
+    --blue2: #3b82f6;
+    /* Active states, Highlights, Rings */
+    --blue-glow: rgba(59, 130, 246, 0.15);
+    /* Soft background highlights */
+
+    --green: #34d399;
+    /* Success / Remaining Calories */
+    --red: #f87171;
+    /* Destructive / Over Goal */
+    --amber: #fbbf24;
+    /* Warning / Fats Macro */
+    --purple: #c084fc;
+    /* Protein Macro */
+
+    --text: #ffffff;
+    /* Primary text (Titles, Big numbers) */
+    --text-dim: #d1d5db;
+    /* Body text */
+    --text2: #9ca3af;
+    /* Secondary text (Subtitles, Units) */
+    --text3: #6b7280;
+    /* Tertiary text (Placeholders, Inactive icons) */
+
     --font: 'Inter', system-ui, sans-serif;
-    --r: 12px;
-    --r-sm: 8px;
-    height: 100dvh;
-    padding-bottom: env(safe-area-inset-bottom); /* Это заполнит пустоту */
-    background: var(--bg); /* Чтобы цвет фона совпадал с пустотой */
+    --r: 16px;
+    /* Rounder cards for a modern feel */
+    --r-sm: 10px;
+    /* Inputs, chips, small buttons */
 }
 
 /* ─── Root reset ────────────────────────────────────────── */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
@@ -41,13 +65,13 @@
   which ONLY works reliably when viewport-fit=cover is in the
   meta tag and the element is NOT inside a fixed/hidden overflow chain.
 */
-html {
-    height: 100%;
-    -webkit-text-size-adjust: 100%;
-}
-
+html,
 body {
     height: 100%;
+    min-height: -webkit-fill-available;
+    margin: 0;
+    padding: 0;
+    -webkit-text-size-adjust: 100%;
     background: var(--bg);
     color: var(--text);
     font-family: var(--font);
@@ -56,19 +80,14 @@ body {
     overscroll-behavior: none;
 }
 
-html, body {
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    background-color: #080b14; /* Твой основной цвет фона */
-    overflow: hidden; /* Запрещаем скролл самого тела */
-}
 #root {
     display: flex;
     flex-direction: column;
-    height: 100dvh; /* Динамическая высота (игнорирует панели Safari) */
+    height: 100dvh;
+    min-height: -webkit-fill-available;
+    /* Динамическая высота (игнорирует панели Safari) */
     width: 100%;
-    background-color: #080b14;
+    background: var(--bg);
 }
 
 /* ─── App shell ─────────────────────────────────────────── */
@@ -86,7 +105,8 @@ html, body {
 /* ─── Scrollable content ────────────────────────────────── */
 .page {
     flex: 1;
-    min-height: 0; /* CRITICAL: allows flex child to shrink below content */
+    min-height: 0;
+    /* CRITICAL: allows flex child to shrink below content */
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
@@ -109,13 +129,18 @@ html, body {
 */
 .bottom-nav {
     flex-shrink: 0;
+    flex-grow: 0;
     background: var(--bg2);
     border-top: 1px solid var(--border);
-    padding-bottom: env(safe-area-inset-bottom, 12px);
+    /* Safe area fallback + heavy padding for standard Safari bar if env is unavaiable */
+    padding-bottom: max(env(safe-area-inset-bottom), 24px);
     display: flex;
+    flex-direction: row;
     align-items: center;
     justify-content: space-around;
-    height: calc(56px + env(safe-area-inset-bottom, 0px));
+    min-height: 56px;
+    z-index: 50;
+    position: relative;
 }
 
 .nav-item {
@@ -170,7 +195,6 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-top: max(20px, env(safe-area-inset-top, 0px));
     padding-top: max(20px, calc(env(safe-area-inset-top, 0px) + 8px));
     padding-bottom: 16px;
 }
@@ -198,6 +222,7 @@ html, body {
     outline: none;
     transition: border-color 0.15s;
     -webkit-appearance: none;
+    appearance: none;
 }
 
 .input:focus {
@@ -227,7 +252,7 @@ html, body {
     margin-bottom: 14px;
 }
 
-.input-row > * {
+.input-row>* {
     flex: 1;
     min-width: 0;
 }
@@ -254,6 +279,7 @@ textarea.input {
     width: 100%;
     transition: opacity 0.15s;
     -webkit-appearance: none;
+    appearance: none;
 }
 
 .btn-primary:active {
@@ -276,6 +302,7 @@ textarea.input {
     font-family: var(--font);
     font-weight: 600;
     -webkit-appearance: none;
+    appearance: none;
 }
 
 .btn-outline:active {
@@ -286,8 +313,8 @@ textarea.input {
 /* ─── FAB ───────────────────────────────────────────────── */
 .fab {
     position: fixed;
-    /* Position above nav: 56px nav + safe area + 12px gap */
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 12px);
+    /* Position above nav: 56px nav + safe area + increased bottom padding */
+    bottom: calc(56px + max(env(safe-area-inset-bottom), 24px) + 12px);
     right: max(16px, env(safe-area-inset-right, 0px));
     width: 50px;
     height: 50px;
@@ -314,10 +341,12 @@ textarea.input {
     left: 0;
     right: 0;
     bottom: 0;
-    height: 100dvh; /* Динамическая высота */
+    height: 100dvh;
+    /* Динамическая высота */
     display: flex;
-    align-items: flex-end; /* Модалка падает вниз */
-    background: rgba(0,0,0,0.7);
+    align-items: flex-end;
+    /* Модалка падает вниз */
+    background: rgba(0, 0, 0, 0.7);
     z-index: 1000;
 }
 
@@ -330,8 +359,10 @@ textarea.input {
     width: 100%;
 
     /* ИСПРАВЛЕНИЕ 3: */
-    max-height: 92vh; /* Фолбэк для старых устройств */
-    max-height: 92dvh; /* Современный вариант для iOS */
+    max-height: 92vh;
+    /* Фолбэк для старых устройств */
+    max-height: 92dvh;
+    /* Современный вариант для iOS */
 
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
@@ -845,6 +876,7 @@ textarea.input {
     font-family: var(--font);
     outline: none;
     -webkit-appearance: none;
+    appearance: none;
 }
 
 .chat-input:focus {
@@ -889,7 +921,8 @@ textarea.input {
 .markdown-content {
     display: flex;
     flex-direction: column;
-    gap: 8px; /* Расстояние между абзацами */
+    gap: 8px;
+    /* Расстояние между абзацами */
     line-height: 1.5;
 }
 
@@ -906,7 +939,8 @@ textarea.input {
 .markdown-content ul,
 .markdown-content ol {
     margin: 0;
-    padding-left: 20px; /* Отступ для списков */
+    padding-left: 20px;
+    /* Отступ для списков */
 }
 
 .markdown-content li {
@@ -1157,9 +1191,13 @@ textarea.input {
 }
 
 @keyframes bounce {
-    0%, 60%, 100% {
+
+    0%,
+    60%,
+    100% {
         transform: translateY(0);
     }
+
     30% {
         transform: translateY(-5px);
     }
@@ -1170,6 +1208,7 @@ textarea.input {
         transform: translateY(40px);
         opacity: 0;
     }
+
     to {
         transform: translateY(0);
         opacity: 1;
@@ -1180,6 +1219,7 @@ textarea.input {
     from {
         opacity: 0;
     }
+
     to {
         opacity: 1;
     }

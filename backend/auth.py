@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 import models
 from database import SessionLocal
 
-SECRET_KEY = os.getenv("SECRET_KEY", "fitflow-super-secret-key-change-in-prod")
+SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
 
