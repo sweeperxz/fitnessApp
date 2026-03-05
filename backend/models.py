@@ -8,6 +8,7 @@ class User(Base):
     email         = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     name          = Column(String, default="")
+    role          = Column(String, default="user", nullable=False)
     created_at    = Column(DateTime, default=func.now())
 
     profile  = relationship("Profile", back_populates="user", uselist=False, cascade="all, delete")
@@ -103,3 +104,14 @@ class UserFood(Base):
     last_used = Column(DateTime, default=func.now())
 
     user = relationship("User", back_populates="foods")
+
+class PushSubscription(Base):
+    __tablename__ = "push_subscriptions"
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), index=True)
+    endpoint   = Column(String, unique=True, nullable=False)
+    p256dh     = Column(String, nullable=False)
+    auth       = Column(String, nullable=False)
+    created_at = Column(DateTime, default=func.now())
+
+    user = relationship("User")

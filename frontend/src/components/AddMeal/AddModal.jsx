@@ -1,13 +1,15 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import SearchTab from './SearchTab'
 import BarcodeTab from './BarcodeTab'
 import ManualTab from './ManualTab'
 import AiTab from './AiTab'
 
-const TABS = ['Поиск', 'Штрихкод', 'Вручную', 'AI Расчёт']
+const TAB_KEYS = ['meals.tabs.search', 'meals.tabs.barcode', 'meals.tabs.manual', 'meals.tabs.ai']
 
 export default function AddModal({ onClose, onAdd }) {
+    const { t } = useTranslation()
     const [tab, setTab] = useState(0)
     const [selected, setSelected] = useState(null)
 
@@ -25,16 +27,16 @@ export default function AddModal({ onClose, onAdd }) {
                 style={{ maxHeight: '92dvh', display: 'flex', flexDirection: 'column' }}
             >
                 <div className="modal-handle" />
-                <div className="modal-title">Добавить блюдо</div>
+                <div className="modal-title">{t('meals.add_title')}</div>
 
                 <div className="food-tabs" style={{ flexShrink: 0 }}>
-                    {TABS.map((t, i) => (
+                    {TAB_KEYS.map((tk, i) => (
                         <button
                             key={i}
                             className={`food-tab${tab === i ? ' active' : ''}`}
                             onClick={() => { setTab(i); setSelected(null) }}
                         >
-                            {t}
+                            {t(tk)}
                         </button>
                     ))}
                 </div>

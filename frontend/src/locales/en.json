@@ -1,0 +1,321 @@
+{
+    "common": {
+        "app_name": "Nutrio",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "loading": "Loading...",
+        "error": "Error",
+        "offline": "No connection",
+        "offline_desc": "Page will load automatically when internet is available",
+        "retry": "Retry",
+        "update_ready": "New version ready",
+        "update_desc": "Update the app",
+        "update": "Update",
+        "logout": "Logout",
+        "save": "Save changes",
+        "saved": "Saved",
+        "offline_toast": "No network · saved locally",
+        "offline_toast_desc": "No internet connection",
+        "synced_toast": "Synced ✓"
+    },
+    "nav": {
+        "nutrition": "Nutrition",
+        "workouts": "Workouts",
+        "progress": "Progress",
+        "ai": "AI",
+        "profile": "Profile",
+        "admin": "Admin"
+    },
+    "today": {
+        "calories": "Calories",
+        "macros": "Macros",
+        "protein": "Protein",
+        "fat": "Fat",
+        "carbs": "Carbs",
+        "eaten": "Eaten",
+        "goal": "Goal",
+        "remaining": "Remaining",
+        "water": "Water",
+        "ml": "ml",
+        "ai_tips": "AI Nutrition Tips",
+        "generating_tips": "Generating personal tips...",
+        "meals": "Meals",
+        "empty_meals": "It's empty here",
+        "empty_meals_desc": "Press + to add a meal",
+        "add_meal": "Add Meal"
+    },
+    "meals": {
+        "Breakfast": "Breakfast",
+        "Lunch": "Lunch",
+        "Dinner": "Dinner",
+        "Snack": "Snack",
+        "add_title": "Add Meal",
+        "tabs": {
+            "search": "Search",
+            "barcode": "Barcode",
+            "manual": "Manual",
+            "ai": "AI Guess"
+        },
+        "search_placeholder": "Search food...",
+        "scan_barcode": "Scan Barcode",
+        "manual_name": "Product Name",
+        "manual_calories": "Calories (kcal)",
+        "manual_protein": "Protein (g)",
+        "manual_fat": "Fat (g)",
+        "manual_carbs": "Carbs (g)",
+        "manual_per_100": "Per 100g",
+        "manual_per_portion": "Per portion",
+        "manual_weight_label": "Portion weight (g)",
+        "manual_total": "Total in portion:",
+        "manual_kcal_in_100": "Kcal in 100g",
+        "manual_kcal_in_portion": "Kcal in portion",
+        "manual_protein_in_100": "Protein in 100g",
+        "manual_protein_in_portion": "Protein in portion",
+        "manual_fat_in_100": "Fat in 100g",
+        "manual_fat_in_portion": "Fat in portion",
+        "manual_carbs_in_100": "Carbs in 100g",
+        "manual_carbs_in_portion": "Carbs in portion",
+        "ai_guess_placeholder": "What did you eat? (e.g. 2 eggs and toast)",
+        "ai_guess_button": "Recognize text",
+        "ai_recognizing": "Recognizing...",
+        "ai_description": "Describe your portion and we'll calculate macros",
+        "ai_use_data": "Use this data",
+        "search_recent": "Recent",
+        "search_searching": "Searching...",
+        "search_not_found": "Nothing found. Try in Russian or English.",
+        "search_empty_recent": "Your recent products will appear here"
+    },
+    "profile": {
+        "title": "Profile",
+        "user": "User",
+        "tabs": {
+            "goals": "Goals",
+            "settings": "Settings"
+        },
+        "main_data": "Main Data",
+        "weight": "Weight (kg)",
+        "goal": "Goal",
+        "activity": "Activity",
+        "recalculate": "Recalculate goals",
+        "macros_goals": "Macros Goals",
+        "account": "Account",
+        "appearance": "Appearance",
+        "theme": "Theme",
+        "theme_dark": "Dark",
+        "theme_light": "Light",
+        "notifications": "Notifications",
+        "push": "Push Notifications",
+        "push_on": "Enabled",
+        "push_off": "Disabled",
+        "test_push": "Send test push",
+        "about": "About App",
+        "version": "Version",
+        "db": "Product Database",
+        "ai_engine": "AI",
+        "language": "Language"
+    },
+    "goals": {
+        "lose": "Weight Loss",
+        "maintain": "Maintenance",
+        "gain": "Muscle Gain"
+    },
+    "activity": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+    },
+    "stats": {
+        "title": "Progress",
+        "periods": {
+            "7": "7 days",
+            "14": "14 days",
+            "30": "30 days"
+        },
+        "charts": {
+            "calories": "Calories",
+            "protein": "Protein",
+            "water": "Water",
+            "workout": "Workouts"
+        },
+        "active_days": "Active Days",
+        "hit_rate": "Goal Hit Rate",
+        "hit_tips": {
+            "great": "Excellent discipline",
+            "good": "Room to grow",
+            "start": "Try every day"
+        },
+        "avg_stats": "Average Stats",
+        "no_data": "No data for this period",
+        "streak": "Streak",
+        "days_streak": "days in a row",
+        "streak_tips": {
+            "great": "Superb result",
+            "good": "Keep it up",
+            "start": "Start a streak today"
+        }
+    },
+    "workouts": {
+        "title": "Workouts",
+        "stats": {
+            "count": "workouts",
+            "sets": "sets",
+            "volume": "volume"
+        },
+        "empty": {
+            "title": "No workouts",
+            "text": "Press + to add for {{date}}"
+        },
+        "add": {
+            "title": "New Workout",
+            "name_label": "Workout Title",
+            "from_lib": "From Library",
+            "manual": "Manual",
+            "choose_ex": "Choose exercises",
+            "sets": "Sets",
+            "reps": "Reps",
+            "kg": "kg",
+            "notes": "Notes",
+            "save": "Save",
+            "saving": "Saving...",
+            "no_weight": "no weight"
+        },
+        "lib": {
+            "title": "Library",
+            "search": "Search...",
+            "add_btn": "+ {{count}} ex.",
+            "muscles": {
+                "All": "All",
+                "Chest": "Chest",
+                "Back": "Back",
+                "Legs": "Legs",
+                "Shoulders": "Shoulders",
+                "Biceps": "Biceps",
+                "Triceps": "Triceps",
+                "Abs": "Abs",
+                "Cardio": "Cardio"
+            }
+        }
+    },
+    "ai_chat": {
+        "title": "AI Assistant",
+        "clear": "Clear",
+        "status": "Online",
+        "welcome_title": "Nutrio Assistant",
+        "welcome_text": "Ask a question about nutrition, training or plan composition",
+        "placeholder": "Ask a question...",
+        "error_reply": "Error receiving answer from AI.",
+        "error_conn": "Server connection error.",
+        "suggest": [
+            "What to eat in the evening if 500 kcal left?",
+            "How to replace deadlift at home?",
+            "Create a meal plan for the day",
+            "How much water to drink when gaining mass?",
+            "Explain the difference between weight loss and cutting"
+        ]
+    },
+    "admin": {
+        "title": "Admin Panel",
+        "users": "Users List",
+        "stats": {
+            "all": "All Users",
+            "admins": "Admins"
+        },
+        "user_card": {
+            "no_name": "No name",
+            "registered": "Registered",
+            "make_admin": "Make ADMIN",
+            "remove_admin": "Remove ADMIN",
+            "is_you": "This is your account (You)",
+            "confirm_role": "Change role for {{email}} to {{role}}?",
+            "confirm_del": "WARNING! This will permanently delete the user and all their data.\n\nTo confirm, enter the user's email:",
+            "del_error_email": "Email entered incorrectly. Deletion cancelled."
+        },
+        "errors": {
+            "forbidden": "Access denied (403 Forbidden). You are not an admin.",
+            "load_fail": "Error loading data.",
+            "self_role": "You cannot change your own role here.",
+            "self_del": "You cannot delete your own account from the admin panel.",
+            "action_fail": "Action failed"
+        }
+    },
+    "auth": {
+        "slogan": "Personal Fitness Tracker",
+        "google_error": "Google auth error",
+        "loading": "Loading...",
+        "continue_google": "Continue with Google",
+        "or_email": "or via email",
+        "no_google": "Google Sign-In not configured.",
+        "add_env": "Add to .env file:",
+        "tabs": {
+            "login": "Login",
+            "register": "Registration"
+        },
+        "fields": {
+            "name": "Name",
+            "name_ph": "What is your name?",
+            "email": "Email",
+            "password": "Password",
+            "password_ph": "Min 6 characters"
+        },
+        "errors": {
+            "email_invalid": "Enter valid email",
+            "pass_short": "Password — min 6 characters",
+            "all_fields": "Fill all required fields",
+            "auth_error": "Auth error"
+        },
+        "btn": {
+            "create": "Create Account",
+            "login": "Login"
+        }
+    },
+    "onboarding": {
+        "slogan": "Your smart nutrition diary",
+        "prog_step": "Step {{curr}} / {{total}}",
+        "steps": {
+            "gender": {
+                "title": "Choose Gender",
+                "desc": "Affects basal metabolic rate calculation",
+                "male": "Male",
+                "female": "Female"
+            },
+            "params": {
+                "title": "Body Specs",
+                "desc": "For accurate macro and water calculation",
+                "age": "Age",
+                "height": "Height (cm)",
+                "weight": "Weight (kg)"
+            },
+            "goal": {
+                "title": "Your Goal",
+                "desc": "Determines calorie intake",
+                "lose": "Weight Loss",
+                "maintain": "Maintenance",
+                "gain": "Muscle Gain",
+                "lose_desc": "Fat loss, calorie deficit",
+                "maintain_desc": "Maintain current form",
+                "gain_desc": "Muscle growth, calorie surplus"
+            },
+            "activity": {
+                "title": "Activity Level",
+                "desc": "Includes weekly physical load",
+                "low": "Low",
+                "medium": "Medium",
+                "high": "High",
+                "low_desc": "No sports",
+                "medium_desc": "1–3 workouts/week",
+                "high_desc": "4+ workouts/week"
+            },
+            "finish": {
+                "title": "All set",
+                "desc": "Personal goals based on your data:",
+                "cal_unit": "kcal/day",
+                "save": "Saving...",
+                "start": "Start"
+            }
+        },
+        "footer": {
+            "next": "Next",
+            "back": "←"
+        }
+    }
+}

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getRecentFoods, addRecentFood } from '../../api'
 import { parseOFF } from '../../utils/openFoodFacts'
 
 export default function SearchTab({ onSelect }) {
+    const { t } = useTranslation()
     const [q, setQ] = useState('')
     const [results, setResults] = useState([])
     const [loading, setLoading] = useState(false)
@@ -64,7 +66,7 @@ export default function SearchTab({ onSelect }) {
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                 <input
                     className="input"
-                    placeholder="Гречка, куриная грудка..."
+                    placeholder={t('meals.search_placeholder')}
                     value={q}
                     onChange={e => setQ(e.target.value)}
                     style={{ flex: 1 }}
@@ -84,21 +86,21 @@ export default function SearchTab({ onSelect }) {
 
             {!isSearching && recentLoaded && recent.length > 0 && (
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 8 }}>
-                    Недавние
+                    {t('meals.search_recent')}
                 </div>
             )}
 
             {isSearching && loading && !results.length && (
-                <div style={{ textAlign: 'center', padding: 24, color: 'var(--text2)', fontSize: 13 }}>Ищем...</div>
+                <div style={{ textAlign: 'center', padding: 24, color: 'var(--text2)', fontSize: 13 }}>{t('meals.search_searching')}</div>
             )}
             {isSearching && !loading && done && !results.length && (
                 <div style={{ textAlign: 'center', padding: 24, color: 'var(--text2)', fontSize: 13, lineHeight: 1.5 }}>
-                    Ничего не найдено.<br />Попробуй на русском или английском.
+                    {t('meals.search_not_found')}
                 </div>
             )}
             {!isSearching && recentLoaded && recent.length === 0 && (
                 <div style={{ textAlign: 'center', padding: 40, color: 'var(--text3)', fontSize: 13, lineHeight: 1.7 }}>
-                    Здесь появятся<br />твои недавние продукты
+                    {t('meals.search_empty_recent')}
                 </div>
             )}
 
@@ -111,12 +113,12 @@ export default function SearchTab({ onSelect }) {
                         <div style={{ fontSize: 14, fontWeight: 600 }}>{item.name}</div>
                         {item.brand && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{item.brand}</div>}
                         <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 3 }}>
-                            Б:{item.protein}г · Ж:{item.fat}г · У:{item.carbs}г
+                            {t('today.protein')[0]}:{item.protein}{t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'} · {t('today.fat')[0]}:{item.fat}{t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'} · {t('today.carbs')[0]}:{item.carbs}{t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'}
                         </div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--blue2)' }}>{item.calories}</div>
-                        <div style={{ fontSize: 10, color: 'var(--text3)' }}>ккал/100г</div>
+                        <div style={{ fontSize: 10, color: 'var(--text3)' }}>{t('today.calories').toLowerCase().includes('кал') ? 'ккал' : 'kcal'}/100{t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'}</div>
                     </div>
                 </div>
             ))}

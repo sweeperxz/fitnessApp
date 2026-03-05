@@ -1,4 +1,3 @@
-import React from 'react';
 
 export const MEAL_TYPES = ['Завтрак', 'Обед', 'Ужин', 'Перекус']
 

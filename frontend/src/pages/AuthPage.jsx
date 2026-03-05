@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { googleAuth, register, login, setToken } from '../api'
 
 const G_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
@@ -15,6 +16,7 @@ function loadGSI(callback) {
 }
 
 export default function AuthPage({ onAuth }) {
+  const { t, i18n } = useTranslation()
   const [mode, setMode] = useState('google')
   const [sub, setSub] = useState('login')
   const [form, setForm] = useState({ email: '', password: '', name: '' })
@@ -24,16 +26,14 @@ export default function AuthPage({ onAuth }) {
   const [gReady, setGReady] = useState(false)
 
   const btnRef = useRef(null)
-  const wrapperRef = useRef(null) // Реф для контейнера, чтобы получить точную ширину
+  const wrapperRef = useRef(null)
 
   const upd = (k, v) => {
     setForm(f => ({ ...f, [k]: v }))
-    // Clear field error on change
     if (fieldErrors[k]) setFieldErrors(fe => ({ ...fe, [k]: false }))
     setError('')
   }
 
-  // Инициализируем Google Sign-In
   useEffect(() => {
     if (!G_CLIENT_ID) return
     loadGSI(() => {
@@ -46,7 +46,7 @@ export default function AuthPage({ onAuth }) {
             setToken(data.access_token)
             onAuth(data)
           } catch (e) {
-            setError(e.response?.data?.detail || 'Ошибка Google авторизации')
+            setError(e.response?.data?.detail || t('auth.google_error'))
           }
           setLoading(false)
         },
@@ -54,9 +54,8 @@ export default function AuthPage({ onAuth }) {
       })
       setGReady(true)
     })
-  }, [])
+  }, [t])
 
-  // Рендерим скрытую кнопку Google поверх нашей
   useEffect(() => {
     if (!gReady || !btnRef.current || !wrapperRef.current || !G_CLIENT_ID) return
     window.google.accounts.id.renderButton(btnRef.current, {
@@ -65,25 +64,24 @@ export default function AuthPage({ onAuth }) {
       size: 'large',
       text: 'signin_with',
       shape: 'rectangular',
-      locale: 'ru',
-      // Берем ширину нашего красивого контейнера
+      locale: i18n.language === 'en' ? 'en' : i18n.language === 'uk' ? 'uk' : 'ru',
       width: wrapperRef.current.offsetWidth || 340,
     })
-  }, [gReady, mode])
+  }, [gReady, mode, i18n.language, t])
 
   const submitEmail = async () => {
     setError('')
     const fe = {}
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
     if (!form.email.trim()) fe.email = true
-    else if (!emailOk) { fe.email = true; setError('Введи корректный email'); setFieldErrors(fe); return }
+    else if (!emailOk) { fe.email = true; setError(t('auth.errors.email_invalid')); setFieldErrors(fe); return }
     if (!form.password) fe.password = true
     if (sub === 'register' && !form.name.trim()) fe.name = true
     if (sub === 'register' && form.password && form.password.length < 6) {
-      fe.password = true; setError('Пароль — минимум 6 символов'); setFieldErrors(fe); return
+      fe.password = true; setError(t('auth.errors.pass_short')); setFieldErrors(fe); return
     }
     if (Object.keys(fe).length) {
-      setFieldErrors(fe); setError('Заполни все обязательные поля'); return
+      setFieldErrors(fe); setError(t('auth.errors.all_fields')); return
     }
     setFieldErrors({})
     setLoading(true)
@@ -91,27 +89,23 @@ export default function AuthPage({ onAuth }) {
       const data = await (sub === 'register' ? register : login)(form)
       setToken(data.access_token)
       onAuth(data)
-    } catch (e) { setError(e.response?.data?.detail || 'Ошибка входа') }
+    } catch (e) { setError(e.response?.data?.detail || t('auth.errors.auth_error')) }
     setLoading(false)
   }
 
   return (
     <div className="auth-wrap fade-in">
-      {/* Logo */}
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text)', letterSpacing: '-1px', marginBottom: 4 }}>
           Nut<span style={{ color: 'var(--blue)' }}>rio</span>
         </div>
-        <div style={{ fontSize: 13, color: 'var(--text2)' }}>Персональный фитнес-трекер</div>
+        <div style={{ fontSize: 13, color: 'var(--text2)' }}>{t('auth.slogan')}</div>
       </div>
 
       <div className="auth-card">
-        {/* ── Google (Кастомный UI + скрытый iframe) ── */}
         {G_CLIENT_ID ? (
           <>
             <div ref={wrapperRef} style={{ position: 'relative', width: '100%', height: 48, marginBottom: 16, borderRadius: 'var(--r)', overflow: 'hidden' }}>
-
-              {/* Наша видимая, стилизованная кнопка */}
               <button
                 style={{
                   width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1,
@@ -127,10 +121,8 @@ export default function AuthPage({ onAuth }) {
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
-                {loading && mode === 'google' ? 'Загрузка...' : 'Продолжить с Google'}
+                {loading && mode === 'google' ? t('auth.loading') : t('auth.continue_google')}
               </button>
-
-              {/* Невидимая кнопка Google поверх нашей */}
               <div
                 ref={btnRef}
                 style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2, opacity: 0 }}
@@ -145,21 +137,21 @@ export default function AuthPage({ onAuth }) {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0 16px' }}>
               <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-              <span style={{ fontSize: 12, color: 'var(--text3)' }}>или по email</span>
+              <span style={{ fontSize: 12, color: 'var(--text3)' }}>{t('auth.or_email')}</span>
               <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
             </div>
           </>
         ) : (
           <div style={{ padding: '12px 14px', borderRadius: 8, marginBottom: 16, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
-            <strong style={{ color: 'var(--amber)' }}>Google Sign-In не настроен.</strong><br />
-            Добавь в <code>.env</code> файл:<br />
+            <strong style={{ color: 'var(--amber)' }}>{t('auth.no_google')}</strong><br />
+            {t('auth.add_env')}<br />
             <code style={{ color: 'var(--amber)' }}>VITE_GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com</code>
           </div>
         )}
 
         {/* ── Email / Password ── */}
         <div className="tab-bar" style={{ marginBottom: 16 }}>
-          {[['login', 'Войти'], ['register', 'Регистрация']].map(([m, l]) => (
+          {[['login', t('auth.tabs.login')], ['register', t('auth.tabs.register')]].map(([m, l]) => (
             <button key={m} className={`tab-btn${sub === m ? ' active' : ''}`}
               onClick={() => { setSub(m); setError(''); setFieldErrors({}) }}>{l}</button>
           ))}
@@ -167,15 +159,15 @@ export default function AuthPage({ onAuth }) {
 
         {sub === 'register' && (
           <div className="form-group">
-            <div className="input-label">Имя</div>
-            <input className="input" placeholder="Как тебя зовут?" value={form.name}
+            <div className="input-label">{t('auth.fields.name')}</div>
+            <input className="input" placeholder={t('auth.fields.name_ph')} value={form.name}
               onChange={e => upd('name', e.target.value)} autoComplete="name"
               style={fieldErrors.name ? { borderColor: 'var(--red)' } : {}} />
           </div>
         )}
 
         <div className="form-group">
-          <div className="input-label">Email</div>
+          <div className="input-label">{t('auth.fields.email')}</div>
           <input className="input" type="email" inputMode="email" placeholder="you@example.com"
             value={form.email} onChange={e => upd('email', e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submitEmail()} autoComplete="email"
@@ -183,8 +175,8 @@ export default function AuthPage({ onAuth }) {
         </div>
 
         <div className="form-group">
-          <div className="input-label">Пароль</div>
-          <input className="input" type="password" placeholder="Минимум 6 символов"
+          <div className="input-label">{t('auth.fields.password')}</div>
+          <input className="input" type="password" placeholder={t('auth.fields.password_ph')}
             value={form.password} onChange={e => upd('password', e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submitEmail()}
             autoComplete={sub === 'register' ? 'new-password' : 'current-password'}
@@ -198,7 +190,7 @@ export default function AuthPage({ onAuth }) {
         )}
 
         <button className="btn-primary" onClick={submitEmail} disabled={loading}>
-          {loading ? 'Загрузка...' : sub === 'register' ? 'Создать аккаунт' : 'Войти'}
+          {loading ? t('auth.loading') : sub === 'register' ? t('auth.btn.create') : t('auth.btn.login')}
         </button>
       </div>
     </div>

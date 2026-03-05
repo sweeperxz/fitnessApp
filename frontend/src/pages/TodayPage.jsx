@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import ReactDOM from 'react-dom'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
@@ -18,6 +19,7 @@ const globalAiTipsCache = {}
 
 // ─── Main Page ────────────────────────────────────────────
 export default function TodayPage() {
+  const { t, i18n } = useTranslation()
   const [day, setDay] = useState(dayjs())
   const [data, setData] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -61,10 +63,10 @@ export default function TodayPage() {
   const waterPct = Math.min((d.water_ml / pr.water_goal) * 100, 100)
   const isToday = day.isSame(dayjs(), 'day')
   const dayLabel = isToday
-    ? 'Сегодня'
+    ? t('common.today')
     : day.isSame(dayjs().subtract(1, 'day'), 'day')
-      ? 'Вчера'
-      : day.format('D MMMM')
+      ? t('common.yesterday')
+      : day.locale(i18n.language).format('D MMMM')
 
   const groups = useMemo(() =>
     MEAL_TYPES
@@ -74,10 +76,10 @@ export default function TodayPage() {
   )
 
   const macros = useMemo(() => [
-    { l: 'Белки', v: d.total_protein, g: pr.protein_goal, c: 'var(--purple)' },
-    { l: 'Жиры', v: d.total_fat, g: pr.fat_goal, c: 'var(--amber)' },
-    { l: 'Углев.', v: d.total_carbs, g: pr.carbs_goal, c: 'var(--blue)' },
-  ], [d.total_protein, d.total_fat, d.total_carbs, pr.protein_goal, pr.fat_goal, pr.carbs_goal])
+    { l: t('today.protein'), v: d.total_protein, g: pr.protein_goal, c: 'var(--purple)' },
+    { l: t('today.fat'), v: d.total_fat, g: pr.fat_goal, c: 'var(--amber)' },
+    { l: t('today.carbs'), v: d.total_carbs, g: pr.carbs_goal, c: 'var(--blue)' },
+  ], [d.total_protein, d.total_fat, d.total_carbs, pr.protein_goal, pr.fat_goal, pr.carbs_goal, t])
 
   const loadAiTips = async () => {
     if (aiTips || tipsLoading) return
@@ -114,6 +116,7 @@ export default function TodayPage() {
   }
 
   const handleToggleTips = () => {
+    tapHaptic()
     const dStr = day.format('YYYY-MM-DD')
     if (!tipsOpen) {
       setTipsOpen(true)
@@ -177,15 +180,15 @@ export default function TodayPage() {
 
               <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
                 {[
-                  { l: 'Съедено', v: Math.round(d.total_calories), c: 'var(--blue2)' },
-                  { l: 'Цель', v: pr.calories_goal, c: 'var(--text)' },
-                  { l: 'Осталось', v: remaining, c: remaining === 0 ? 'var(--red)' : 'var(--green)' },
+                  { l: t('today.eaten'), v: Math.round(d.total_calories), c: 'var(--blue2)' },
+                  { l: t('today.goal'), v: pr.calories_goal, c: 'var(--text)' },
+                  { l: t('today.remaining'), v: t('today.remaining'), v2: remaining, c: remaining === 0 ? 'var(--red)' : 'var(--green)' },
                 ].map(s => (
                   <div key={s.l} style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: 9, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 700 }}>
                       {s.l}
                     </div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: s.c, marginTop: 2 }}>{s.v}</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: s.c, marginTop: 2 }}>{s.v2 !== undefined ? s.v2 : s.v}</div>
                   </div>
                 ))}
               </div>
@@ -196,10 +199,10 @@ export default function TodayPage() {
 
       {/* Вода */}
       <div className="card" style={{ '--i': 1 }}>
-        <div className="card-label">Вода</div>
+        <div className="card-label">{t('today.water')}</div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
           <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1 }}>{d.water_ml}</span>
-          <span style={{ fontSize: 13, color: 'var(--text2)' }}>/ {pr.water_goal} мл</span>
+          <span style={{ fontSize: 13, color: 'var(--text2)' }}>/ {pr.water_goal} {t('today.ml')}</span>
         </div>
         <div className="water-track">
           <div className="water-fill" style={{ '--fill-w': waterPct + '%' }} />
@@ -207,7 +210,7 @@ export default function TodayPage() {
         <div className="water-btns">
           {[100, 200, 250, 500].map(ml => (
             <button key={ml} className="water-btn"
-              onClick={() => { tapHaptic(); logWater({ day: day.format('YYYY-MM-DD'), amount_ml: ml }).then(load) }}>
+              onClick={() => { tapHaptic(); logWater({ day: day.format('YYYY-MM-DD'), amount_ml: ml }).then(() => { successHaptic(); load(); }) }}>
               +{ml}
             </button>
           ))}
@@ -220,7 +223,7 @@ export default function TodayPage() {
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--blue2)" strokeWidth={2} strokeLinecap="round">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
           </svg>
-          <span className="tips-title" style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>ИИ-советы по питанию</span>
+          <span className="tips-title" style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>{t('today.ai_tips')}</span>
           {tipsLoading ? (
             <div style={{ width: 14, height: 14, border: '2px solid var(--border)', borderTopColor: 'var(--blue2)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
           ) : (
@@ -241,7 +244,7 @@ export default function TodayPage() {
               ))
             ) : tipsLoading ? (
               <div style={{ padding: '8px 0', fontSize: 12, color: 'var(--text3)', textAlign: 'center' }}>
-                Генерация персональных советов...
+                {t('today.generating_tips')}
               </div>
             ) : null}
           </div>
@@ -250,7 +253,7 @@ export default function TodayPage() {
 
       {/* Приёмы пищи */}
       <div className="card" style={{ '--i': 2 }}>
-        <div className="card-label">Приёмы пищи</div>
+        <div className="card-label">{t('today.meals')}</div>
         {groups.length === 0
           ? (
             <div className="empty" style={{ paddingTop: 20, paddingBottom: 20 }}>
@@ -261,13 +264,13 @@ export default function TodayPage() {
                   <line x1="15" y1="9" x2="15.01" y2="9" />
                 </svg>
               </div>
-              <div className="empty-title">Пока пусто</div>
-              <div className="empty-text">Нажми + чтобы добавить приём пищи</div>
+              <div className="empty-title">{t('today.empty_meals')}</div>
+              <div className="empty-text">{t('today.empty_meals_desc')}</div>
             </div>
           )
           : groups.map(g => (
             <div key={g.type}>
-              <div className="meal-group-label">{g.type}</div>
+              <div className="meal-group-label">{t(`meals.${g.type}`)}</div>
               {g.items.map(m => (
                 <div key={m.id} className="meal-item">
                   <div style={{
@@ -280,7 +283,7 @@ export default function TodayPage() {
                   </div>
                   <div className="meal-info">
                     <div className="meal-name">{m.name}</div>
-                    <div className="meal-macro">Б:{m.protein}г · Ж:{m.fat}г · У:{m.carbs}г · <span className="meal-cal">{m.calories} ккал</span></div>
+                    <div className="meal-macro">{t('today.protein')[0]}:{m.protein}{t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'} · {t('today.fat')[0]}:{m.fat}{t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'} · {t('today.carbs')[0]}:{m.carbs}{t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'} · <span className="meal-cal">{m.calories} {t('today.calories').toLowerCase().includes('кал') ? 'ккал' : 'kcal'}</span></div>
                   </div>
                   <button className="meal-del" onClick={() => { mediumHaptic(); deleteMeal(m.id).then(load) }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">

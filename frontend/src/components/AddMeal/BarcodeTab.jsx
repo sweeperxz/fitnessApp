@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import BarcodeScanner from '../BarcodeScanner'
 import { parseOFF } from '../../utils/openFoodFacts'
+import { addRecentFood } from '../../api'
 
 export default function BarcodeTab({ onSelect }) {
     const [scanning, setScanning] = useState(false)
@@ -30,6 +31,11 @@ export default function BarcodeTab({ onSelect }) {
             setError('Ошибка соединения. Проверь интернет.')
         }
         setLoading(false)
+    }
+
+    const handleSelect = (item) => {
+        addRecentFood(item).catch(() => { })
+        onSelect(item)
     }
 
     // Fullscreen сканер
@@ -137,7 +143,7 @@ export default function BarcodeTab({ onSelect }) {
                             </div>
                         ))}
                     </div>
-                    <button className="btn-primary" onClick={() => onSelect(found)}>
+                    <button className="btn-primary" onClick={() => handleSelect(found)}>
                         Добавить этот продукт
                     </button>
                 </div>

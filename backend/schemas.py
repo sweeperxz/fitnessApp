@@ -18,7 +18,19 @@ class TokenResponse(BaseModel):
     user_id: int
     name: str
     email: str
+    role: str = "user"
     has_profile: bool
+
+class UserAdminResponse(BaseModel):
+    id: int
+    email: str
+    name: str
+    role: str
+    created_at: datetime
+    class Config: from_attributes = True
+
+class UserRoleUpdate(BaseModel):
+    role: str
 
 # ── Profile ───────────────────────────────────────────────
 class ProfileCreate(BaseModel):
@@ -141,3 +153,14 @@ class FoodItemResponse(FoodItemBase):
 
     class Config:
         from_attributes = True
+
+class PushSubscriptionCreate(BaseModel):
+    endpoint: str
+    p256dh: str
+    auth: str
+
+class PushSubscriptionResponse(PushSubscriptionCreate):
+    id: int
+    user_id: int
+    created_at: datetime
+    class Config: from_attributes = True

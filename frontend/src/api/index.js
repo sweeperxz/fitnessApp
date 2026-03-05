@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { enqueue, flush, setupAutoFlush } from '../utils/offlineQueue'
+import { errorHaptic } from '../utils/haptic'
 
 const api = axios.create({ baseURL: '/api' })
 
@@ -23,12 +24,14 @@ api.interceptors.response.use(
     if (!err.response && err.config) {
       const method = err.config.method
       if (method === 'post' || method === 'delete') {
+        errorHaptic()
         enqueue(method, err.config.url, err.config.data ? JSON.parse(err.config.data) : null)
         // Return a fake success so the UI doesn't show an error
         return Promise.resolve({ data: { _offline: true } })
       }
     }
 
+    errorHaptic()
     return Promise.reject(err)
   }
 )
@@ -62,3 +65,9 @@ export const sendChatMessage = d => api.post('/ai/chat', d).then(r => r.data)
 
 export const getRecentFoods = () => api.get('/foods/recent').then(r => r.data)
 export const addRecentFood = d => api.post('/foods/recent', d).then(r => r.data)
+
+export const getAdminUsers = () => api.get('/admin/users').then(r => r.data)
+export const updateAdminUserRole = (id, role) => api.put(`/admin/users/${id}/role`, { role }).then(r => r.data)
+export const deleteAdminUser = id => api.delete(`/admin/users/${id}`).then(r => r.data)
+
+export default api

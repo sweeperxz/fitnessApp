@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { onQueueChange } from '../utils/offlineQueue'
 
 /**
  * OfflineToast — shows status messages for offline queue
- * Listens to:
- * - navigator.onLine changes
- * - offlineQueue size changes
- * - custom 'nutrio:synced' events from api layer
  */
 export default function OfflineToast() {
+    const { t } = useTranslation()
     const [toast, setToast] = useState(null) // { text, type: 'offline'|'synced' }
     const timerRef = useRef(null)
 
@@ -22,17 +20,17 @@ export default function OfflineToast() {
         // When items are added to queue
         const unsub = onQueueChange((size) => {
             if (size > 0) {
-                show('Нет сети · сохранено локально', 'offline', 3000)
+                show(t('common.offline_toast'), 'offline', 3000)
             }
         })
 
         // When we go offline
-        const handleOffline = () => show('Нет подключения к интернету', 'offline', 4000)
+        const handleOffline = () => show(t('common.offline_toast_desc'), 'offline', 4000)
 
         // When synced (dispatched from api/index.js)
         const handleSynced = (e) => {
             const { synced } = e.detail || {}
-            show(`Синхронизировано ✓ (${synced})`, 'synced', 2500)
+            show(`${t('common.synced_toast')} (${synced})`, 'synced', 2500)
         }
 
         window.addEventListener('offline', handleOffline)
@@ -44,7 +42,7 @@ export default function OfflineToast() {
             window.removeEventListener('offline', handleOffline)
             window.removeEventListener('nutrio:synced', handleSynced)
         }
-    }, [show])
+    }, [show, t])
 
     if (!toast) return null
 

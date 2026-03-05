@@ -187,3 +187,40 @@ def get_stats(db: Session, user_id: int, days: int = 30) -> schemas.Stats:
         avg_water=sum(d.water_ml for d in active) / len(active) if active else 0,
         streak=streak,
     )
+
+# ── Push Notifications ────────────────────────────────────
+def subscribe_push(db: Session, user_id: int, data: schemas.PushSubscriptionCreate):
+    # Check if this endpoint already exists for any user
+    sub = db.query(models.PushSubscription).filter(models.PushSubscription.endpoint == data.endpoint).first()
+    if sub:
+        # If exists, update user_id and keys (maybe same user, maybe different)
+        sub.user_id = user_id
+        sub.p256dh  = data.p256dh
+        sub.auth    = data.auth
+    else:
+        sub = models.PushSubscription(user_id=user_id, **data.model_dump())
+        db.add(sub)
+    db.commit()
+    db.refresh(sub)
+    return sub
+
+    return db.query(models.PushSubscription).filter(models.PushSubscription.user_id == user_id).all()
+
+# ── Admin ──────────────────────────────────────────────────
+def update_user_role(db: Session, user_id: int, role: str):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user:
+        user.role = role
+        db.commit()
+        db.refresh(user)
+    return user
+
+def delete_user(db: Session, user_id: int):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user:
+        # Delete push subscriptions explicitly as they don't have cascade in SQLAlchemy
+        db.query(models.PushSubscription).filter(models.PushSubscription.user_id == user_id).delete()
+        db.delete(user)
+        db.commit()
+        return True
+    return False

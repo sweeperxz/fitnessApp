@@ -1,21 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getProfile, sendChatMessage } from '../api'
 import ReactMarkdown from 'react-markdown'
-
-const SUGGEST = [
-    'Что поесть вечером, если осталось 500 ккал?',
-    'Как заменить становую тягу дома?',
-    'Составь план питания на день',
-    'Сколько воды пить при наборе массы?',
-    'Объясни разницу между похудением и сушкой',
-]
+import { tapHaptic, successHaptic } from '../utils/haptic'
 
 export default function AIPage() {
+    const { t } = useTranslation()
     const [msgs, setMsgs] = useState([])
     const [input, setInput] = useState('')
     const [loading, setLoading] = useState(false)
     const [profile, setProfile] = useState(null)
     const endRef = useRef(null)
+
+    const SUGGEST = t('ai_chat.suggest', { returnObjects: true }) || []
 
     useEffect(() => {
         getProfile().catch(() => null).then(p => setProfile(p))
@@ -28,6 +25,7 @@ export default function AIPage() {
         const msg = text || input.trim()
         if (!msg || loading) return
 
+        tapHaptic()
         setInput('')
         const next = [...msgs, { role: 'user', content: msg }]
         setMsgs(next)
@@ -36,12 +34,13 @@ export default function AIPage() {
         try {
             const data = await sendChatMessage({ messages: next })
             const parts = data.candidates?.[0]?.content?.parts;
-            const reply = parts ? parts.map(p => p.text).join('') : 'Ошибка получения ответа от ИИ.';
+            const reply = parts ? parts.map(p => p.text).join('') : t('ai_chat.error_reply');
 
+            successHaptic()
             setMsgs(m => [...m, { role: 'assistant', content: reply }])
         } catch (error) {
             console.error("AI Error:", error)
-            setMsgs(m => [...m, { role: 'assistant', content: 'Ошибка соединения с сервером.' }])
+            setMsgs(m => [...m, { role: 'assistant', content: t('ai_chat.error_conn') }])
         } finally {
             setLoading(false)
         }
@@ -50,7 +49,7 @@ export default function AIPage() {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <div className="page-header" style={{ flexShrink: 0, paddingBottom: 12 }}>
-                <div className="page-title">AI-<span>ассистент</span></div>
+                <div className="page-title">{t('ai_chat.title').split('-')[0]}<span>-{t('ai_chat.title').split('-')[1]}</span></div>
                 {msgs.length > 0 && (
                     <button onClick={() => setMsgs([])} style={{
                         background: 'var(--bg3)',
@@ -63,7 +62,7 @@ export default function AIPage() {
                         cursor: 'pointer',
                         fontFamily: 'var(--font)'
                     }}>
-                        Очистить
+                        {t('ai_chat.clear')}
                     </button>
                 )}
             </div>
@@ -90,9 +89,9 @@ export default function AIPage() {
                                             d="M12 2v3M12 19v3M2 12h3M19 12h3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12" />
                                     </svg>
                                 </div>
-                                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Nutrio Ассистент</div>
-                                <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 6 }}>В сети</div>
-                                <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>Задай вопрос о питании, тренировках или составлении плана
+                                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t('ai_chat.welcome_title')}</div>
+                                <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 6 }}>{t('ai_chat.status')}</div>
+                                <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>{t('ai_chat.welcome_text')}
                                 </div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -166,7 +165,7 @@ export default function AIPage() {
             </div>
 
             <div style={{ display: 'flex', gap: 8, paddingTop: 10, borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-                <input className="chat-input" placeholder="Задай вопрос..." value={input}
+                <input className="chat-input" placeholder={t('ai_chat.placeholder')} value={input}
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()} />
                 <button className="chat-send" onClick={() => send()} disabled={!input.trim() || loading}>

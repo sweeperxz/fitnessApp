@@ -17,7 +17,13 @@ except ImportError:
 
 import models, schemas, crud
 from database import SessionLocal, engine
-from auth import get_db, get_current_user, hash_password, verify_password, create_token
+from auth import get_db, get_current_user, get_admin_user, hash_password, verify_password, create_token
+
+try:
+    from pywebpush import webpush, WebPushException
+except ImportError:
+    webpush = None
+    WebPushException = Exception
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -47,7 +53,7 @@ def register(data: schemas.RegisterRequest, db: Session = Depends(get_db)):
         raise HTTPException(400, "Пароль минимум 6 символов")
     user = models.User(email=data.email.lower(), password_hash=hash_password(data.password), name=data.name)
     db.add(user); db.commit(); db.refresh(user)
-    return schemas.TokenResponse(access_token=create_token(user.id), user_id=user.id, name=user.name, email=user.email, has_profile=False)
+    return schemas.TokenResponse(access_token=create_token(user.id), user_id=user.id, name=user.name, email=user.email, role=user.role, has_profile=False)
 
 @app.post("/auth/login", response_model=schemas.TokenResponse)
 def login(data: schemas.LoginRequest, db: Session = Depends(get_db)):
@@ -55,7 +61,7 @@ def login(data: schemas.LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(401, "Неверный email или пароль")
     profile = crud.get_profile(db, user.id)
-    return schemas.TokenResponse(access_token=create_token(user.id), user_id=user.id, name=user.name, email=user.email, has_profile=bool(profile and profile.goal))
+    return schemas.TokenResponse(access_token=create_token(user.id), user_id=user.id, name=user.name, email=user.email, role=user.role, has_profile=bool(profile and profile.goal))
 
 # ── Auth: Google OAuth ────────────────────────────────────
 @app.post("/auth/google", response_model=schemas.TokenResponse)
@@ -84,7 +90,7 @@ def google_auth(data: schemas.GoogleAuthRequest, db: Session = Depends(get_db)):
                 user.name = name; db.commit()
         
         profile = crud.get_profile(db, user.id)
-        return schemas.TokenResponse(access_token=create_token(user.id), user_id=user.id, name=user.name, email=user.email, has_profile=bool(profile and profile.goal))
+        return schemas.TokenResponse(access_token=create_token(user.id), user_id=user.id, name=user.name, email=user.email, role=user.role, has_profile=bool(profile and profile.goal))
     
     except ValueError as e:
         raise HTTPException(401, f"Невалидный Google токен: {str(e)}")
@@ -92,7 +98,31 @@ def google_auth(data: schemas.GoogleAuthRequest, db: Session = Depends(get_db)):
 @app.get("/auth/me", response_model=schemas.TokenResponse)
 def me(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     profile = crud.get_profile(db, user.id)
-    return schemas.TokenResponse(access_token="", user_id=user.id, name=user.name, email=user.email, has_profile=bool(profile and profile.goal))
+    return schemas.TokenResponse(access_token="", user_id=user.id, name=user.name, email=user.email, role=user.role, has_profile=bool(profile and profile.goal))
+
+# ── Admin ──────────────────────────────────────────────────
+@app.get("/admin/users", response_model=list[schemas.UserAdminResponse])
+def get_all_users(admin: models.User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    return db.query(models.User).order_by(models.User.id.desc()).all()
+
+@app.put("/admin/users/{user_id}/role", response_model=schemas.UserAdminResponse)
+def update_role(user_id: int, data: schemas.UserRoleUpdate, admin: models.User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    # Защита от снятия админки самому себе
+    if user_id == admin.id and data.role != 'admin':
+        raise HTTPException(400, "Нельзя снять роль администратора самому себе")
+    user = crud.update_user_role(db, user_id, data.role)
+    if not user:
+        raise HTTPException(404, "Пользователь не найден")
+    return user
+
+@app.delete("/admin/users/{user_id}")
+def delete_user(user_id: int, admin: models.User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    if user_id == admin.id:
+        raise HTTPException(400, "Нельзя удалить самого себя")
+    success = crud.delete_user(db, user_id)
+    if not success:
+        raise HTTPException(404, "Пользователь не найден")
+    return {"ok": True}
 
 # ── Profile ───────────────────────────────────────────────
 @app.get("/profile", response_model=schemas.Profile)
@@ -112,7 +142,18 @@ def get_nutrition(day: date, user: models.User = Depends(get_current_user), db: 
 
 @app.post("/nutrition/meal", response_model=schemas.Meal)
 def add_meal(data: schemas.MealCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return crud.add_meal(db, user.id, data)
+    today = date.today()
+    nutrition_before = crud.get_nutrition_day(db, user.id, today)
+    profile = crud.get_profile(db, user.id)
+    
+    meal = crud.add_meal(db, user.id, data)
+    
+    if profile and profile.calories_goal:
+        nutrition_after = crud.get_nutrition_day(db, user.id, today)
+        if nutrition_before.total_calories < profile.calories_goal and nutrition_after.total_calories >= profile.calories_goal:
+            send_push_notification(db, user.id, "🎯 Отлично! Дневная цель по калориям достигнута!")
+            
+    return meal
 
 @app.delete("/nutrition/meal/{meal_id}")
 def delete_meal(meal_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -120,7 +161,18 @@ def delete_meal(meal_id: int, user: models.User = Depends(get_current_user), db:
 
 @app.post("/nutrition/water", response_model=schemas.WaterLog)
 def log_water(data: schemas.WaterLogCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return crud.log_water(db, user.id, data)
+    today = date.today()
+    nutrition_before = crud.get_nutrition_day(db, user.id, today)
+    profile = crud.get_profile(db, user.id)
+    
+    water = crud.log_water(db, user.id, data)
+    
+    if profile and profile.water_goal:
+        nutrition_after = crud.get_nutrition_day(db, user.id, today)
+        if nutrition_before.water_ml < profile.water_goal and nutrition_after.water_ml >= profile.water_goal:
+            send_push_notification(db, user.id, "💧 Супер! Вы выпили дневную норму воды!")
+            
+    return water
 
 # ── Workouts ──────────────────────────────────────────────
 @app.get("/workouts", response_model=list[schemas.Workout])
@@ -234,3 +286,68 @@ def add_recent_food(data: schemas.FoodItemCreate, user: models.User = Depends(ge
 
     db.commit()
     return {"ok": True}
+
+
+# ── Push Notifications ────────────────────────────────────
+VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY")
+VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY")
+VAPID_EMAIL = os.getenv("VAPID_EMAIL", "mailto:test@example.com")
+
+def send_push_notification(db: Session, user_id: int, message: str):
+    if not webpush or not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
+        return
+    subs = crud.get_push_subscriptions(db, user_id)
+    for s in subs:
+        try:
+            webpush(
+                subscription_info={"endpoint": s.endpoint, "keys": {"p256dh": s.p256dh, "auth": s.auth}},
+                data=message,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={"sub": VAPID_EMAIL if VAPID_EMAIL.startswith(("mailto:", "https://")) else f"mailto:{VAPID_EMAIL}"}
+            )
+        except Exception:
+            pass
+
+
+@app.get("/push/vapid-public-key")
+def get_vapid_public_key():
+    if not VAPID_PUBLIC_KEY:
+        raise HTTPException(500, "VAPID_PUBLIC_KEY не настроен")
+    return {"public_key": VAPID_PUBLIC_KEY}
+
+
+@app.post("/push/subscribe")
+def subscribe(data: schemas.PushSubscriptionCreate, user: models.User = Depends(get_current_user),
+              db: Session = Depends(get_db)):
+    crud.subscribe_push(db, user.id, data)
+    return {"ok": True}
+
+
+@app.post("/push/test")
+def test_push(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not webpush:
+        raise HTTPException(500, "библиотека pywebpush не установлена")
+    if not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
+        raise HTTPException(500, f"VAPID ключи не настроены. Добавьте VAPID_PRIVATE_KEY и VAPID_PUBLIC_KEY в .env")
+
+    subs = crud.get_push_subscriptions(db, user.id)
+    if not subs:
+        raise HTTPException(404, "Подписки не найдены. Сначала включи уведомления в профиле.")
+
+    results = []
+    for s in subs:
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": s.endpoint,
+                    "keys": {"p256dh": s.p256dh, "auth": s.auth}
+                },
+                data="Привет от Nutrio! Уведомления работают 🎉",
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={"sub": VAPID_EMAIL if VAPID_EMAIL.startswith(("mailto:", "https://")) else f"mailto:{VAPID_EMAIL}"}
+            )
+            results.append({"endpoint": s.endpoint, "status": "sent"})
+        except WebPushException as ex:
+            results.append({"endpoint": s.endpoint, "status": "failed", "error": str(ex)})
+
+    return {"ok": True, "results": results}

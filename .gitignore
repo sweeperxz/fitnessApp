@@ -279,3 +279,6 @@ pgdata/
 .agent/
 .agents/
 skills-lock.json
+
+# Vite PWA
+frontend/dev-dist/

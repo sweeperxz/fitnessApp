@@ -1,10 +1,12 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MEAL_TYPES } from '../../utils/constants'
 import { addRecentFood } from '../../api'
 
 export default function ManualTab({ initial, onAdd, onClose }) {
+    const { t } = useTranslation()
     const [form, setForm] = useState({
-        meal_type: 'Завтрак',
+        meal_type: t('meals.Breakfast'),
         name: '', calories: '', protein: '', fat: '', carbs: '', weight: '100',
         ...(initial || {}),
     })
@@ -50,14 +52,14 @@ export default function ManualTab({ initial, onAdd, onClose }) {
     return (
         <>
             <div className="form-group">
-                <div className="input-label">Приём пищи</div>
+                <div className="input-label">{t('today.meals')}</div>
                 <select className="input" value={form.meal_type} onChange={e => upd('meal_type', e.target.value)}>
-                    {MEAL_TYPES.map(t => <option key={t}>{t}</option>)}
+                    {MEAL_TYPES.map(tk => <option key={tk} value={tk}>{t(`meals.${tk}`)}</option>)}
                 </select>
             </div>
             <div className="form-group">
-                <div className="input-label">Название</div>
-                <input className="input" placeholder="Например: Куриная грудка" value={form.name}
+                <div className="input-label">{t('meals.manual_name')}</div>
+                <input className="input" placeholder={t('meals.search_placeholder')} value={form.name}
                     onChange={e => upd('name', e.target.value)} />
             </div>
 
@@ -65,27 +67,27 @@ export default function ManualTab({ initial, onAdd, onClose }) {
                 <button
                     onClick={() => setIsPer100Mode(true)}
                     style={{ flex: 1, padding: '8px 0', border: 'none', background: isPer100Mode ? 'var(--bg2)' : 'transparent', color: isPer100Mode ? 'var(--text)' : 'var(--text2)', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: '0.2s', boxShadow: isPer100Mode ? '0 1px 3px rgba(0,0,0,0.3)' : 'none' }}>
-                    На 100 грамм
+                    {t('meals.manual_per_100')}
                 </button>
                 <button
                     onClick={() => setIsPer100Mode(false)}
                     style={{ flex: 1, padding: '8px 0', border: 'none', background: !isPer100Mode ? 'var(--bg2)' : 'transparent', color: !isPer100Mode ? 'var(--text)' : 'var(--text2)', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: '0.2s', boxShadow: !isPer100Mode ? '0 1px 3px rgba(0,0,0,0.3)' : 'none' }}>
-                    Готовая порция
+                    {t('meals.manual_per_portion')}
                 </button>
             </div>
 
             {isPer100Mode && (
                 <div className="form-group">
-                    <div className="input-label">Вес съеденной порции (г)</div>
+                    <div className="input-label">{t('meals.manual_weight_label')}</div>
                     <input className="input" type="number" inputMode="decimal" value={form.weight}
                         onChange={e => upd('weight', e.target.value)} />
 
                     <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 8, lineHeight: 1.6, background: 'var(--bg4)', padding: '10px 12px', borderRadius: 'var(--r-sm)' }}>
-                        Итого в порции: <span style={{ color: 'var(--blue2)', fontWeight: 800, fontSize: 13 }}>{Math.round(+form.calories * w / 100)} ккал</span>
+                        {t('meals.manual_total')} <span style={{ color: 'var(--blue2)', fontWeight: 800, fontSize: 13 }}>{Math.round(+form.calories * w / 100)} {t('today.calories').toLowerCase().includes('кал') ? 'ккал' : 'kcal'}</span>
                         <div style={{ marginTop: 4 }}>
-                            Белки: <span style={{ color: 'var(--text)' }}>{Math.round(+form.protein * w / 100)}г</span> ·
-                            Жиры: <span style={{ color: 'var(--text)' }}>{Math.round(+form.fat * w / 100)}г</span> ·
-                            Углев: <span style={{ color: 'var(--text)' }}>{Math.round(+form.carbs * w / 100)}г</span>
+                            {t('today.protein')}: <span style={{ color: 'var(--text)' }}>{Math.round(+form.protein * w / 100)}{t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'}</span> ·
+                            {t('today.fat')}: <span style={{ color: 'var(--text)' }}>{Math.round(+form.fat * w / 100)}{t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'}</span> ·
+                            {t('today.carbs')}: <span style={{ color: 'var(--text)' }}>{Math.round(+form.carbs * w / 100)}{t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'}</span>
                         </div>
                     </div>
                 </div>
