@@ -34,14 +34,14 @@ class UserRoleUpdate(BaseModel):
 
 # ── Profile ───────────────────────────────────────────────
 class ProfileCreate(BaseModel):
-    weight: float = Field(default=70, ge=20, le=500)
+    weight: float = Field(default=70, ge=1, le=1000)
     goal: str = "maintain"
     activity: str = "medium"
-    water_goal: int = Field(default=2500, ge=500, le=10000)
-    calories_goal: int = Field(default=2000, ge=500, le=15000)
-    protein_goal: int = Field(default=150, ge=0, le=1000)
-    fat_goal: int = Field(default=70, ge=0, le=1000)
-    carbs_goal: int = Field(default=250, ge=0, le=2000)
+    water_goal: int = Field(default=2500, ge=0, le=20000)
+    calories_goal: int = Field(default=2000, ge=0, le=30000)
+    protein_goal: int = Field(default=150, ge=0, le=2000)
+    fat_goal: int = Field(default=70, ge=0, le=2000)
+    carbs_goal: int = Field(default=250, ge=0, le=5000)
 
 class Profile(ProfileCreate):
     id: int

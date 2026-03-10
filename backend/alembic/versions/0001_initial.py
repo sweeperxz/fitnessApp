@@ -8,7 +8,7 @@ Create Date: 2025-01-01 00:00:00
 from alembic import op
 import sqlalchemy as sa
 
-revision = '0001_initial'
+revision = '0001'
 down_revision = None
 branch_labels = None
 depends_on = None

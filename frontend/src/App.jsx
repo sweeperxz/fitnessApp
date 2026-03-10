@@ -239,7 +239,7 @@ export default function App() {
       <div className="app">
         <div className="page" ref={swipeRef} {...swipeHandlers}>
           <div className="page-enter" key={tab}>
-            <ChunkErrorBoundary tab={tab}>
+            <TranslatedChunkErrorBoundary tab={tab}>
               <Suspense fallback={<PageSkeleton />}>
                 {tab === 'today' && <TodayPage />}
                 {tab === 'workouts' && <WorkoutsPage />}
@@ -248,7 +248,7 @@ export default function App() {
                 {tab === 'profile' && <ProfilePage onLogout={handleLogout} />}
                 {tab === 'admin' && role === 'admin' && <AdminPage />}
               </Suspense>
-            </ChunkErrorBoundary>
+            </TranslatedChunkErrorBoundary>
           </div>
         </div>
         <nav className="bottom-nav">
