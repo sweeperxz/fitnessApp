@@ -173,8 +173,22 @@ export default function App() {
     const token = getToken()
     if (!token) return setStatus('auth')
     getMe()
-      .then(d => { setStatus(d.has_profile ? 'app' : 'onboarding'); setRole(d.role || 'user') })
-      .catch(() => { removeToken(); setStatus('auth') })
+      .then(d => { 
+        setStatus(d.has_profile ? 'app' : 'onboarding')
+        setRole(d.role || 'user')
+        localStorage.setItem('_nutrio_has_profile', d.has_profile ? '1' : '0')
+        localStorage.setItem('_nutrio_role', d.role || 'user')
+      })
+      .catch((err) => {
+        if (err.isOffline || !navigator.onLine) {
+          const hp = localStorage.getItem('_nutrio_has_profile') === '1'
+          setStatus(hp ? 'app' : 'onboarding')
+          setRole(localStorage.getItem('_nutrio_role') || 'user')
+        } else {
+          removeToken()
+          setStatus('auth')
+        }
+      })
     applyTheme()
   }, [])
 

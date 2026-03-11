@@ -24,6 +24,7 @@ export default function TodayPage() {
   const [data, setData] = useState(null)
   const [profile, setProfile] = useState(null)
   const [modal, setModal] = useState(false)
+  const [isOffline, setIsOffline] = useState(!navigator.onLine)
 
   // Инициализируем стейт из кэша для текущего дня (по умолчанию сегодня)
   const initDateStr = dayjs().format('YYYY-MM-DD')
@@ -41,13 +42,26 @@ export default function TodayPage() {
       ])
       setData(nd)
       setProfile(pr)
-    } catch {
+      setIsOffline(false)
+    } catch (err) {
+      if (err.isOffline || !navigator.onLine) setIsOffline(true)
       setData({ meals: [], total_calories: 0, total_protein: 0, total_fat: 0, total_carbs: 0, water_ml: 0 })
       setProfile(fb)
     }
   }, [day])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    const handleOnline = () => { setIsOffline(false); load() }
+    const handleOffline = () => setIsOffline(true)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [load])
 
   // Обновляем ИИ-советы ИЗ КЭША при смене дня (а не просто обнуляем)
   useEffect(() => {
@@ -254,7 +268,19 @@ export default function TodayPage() {
       {/* Приёмы пищи */}
       <div className="card" style={{ '--i': 2 }}>
         <div className="card-label">{t('today.meals')}</div>
-        {groups.length === 0
+        {isOffline 
+          ? (
+            <div className="empty" style={{ paddingTop: 20, paddingBottom: 20 }}>
+              <div className="empty-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth={1.5} strokeLinecap="round">
+                  <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.56 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01" />
+                </svg>
+              </div>
+              <div className="empty-title">{t('common.offline')}</div>
+              <div className="empty-text">{t('common.offline_desc')}</div>
+            </div>
+          )
+          : groups.length === 0
           ? (
             <div className="empty" style={{ paddingTop: 20, paddingBottom: 20 }}>
               <div className="empty-icon">

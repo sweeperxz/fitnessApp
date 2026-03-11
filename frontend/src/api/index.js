@@ -29,6 +29,14 @@ api.interceptors.response.use(
         // Return a fake success so the UI doesn't show an error
         return Promise.resolve({ data: { _offline: true } })
       }
+      
+      // For GET requests or others without a response
+      err.isOffline = true
+    }
+
+    // Capture standard offline from service worker mock responses if needed
+    if (err.response?.data?.error === 'offline') {
+      err.isOffline = true
     }
 
     errorHaptic()

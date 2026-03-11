@@ -1,7 +1,7 @@
 const CACHE = 'nutrio-v2'
 const STATIC = ['/', '/index.html']
 const INJECTED = (self.__WB_MANIFEST || []).map(e => e.url)
-const FULL_STATIC = [...STATIC, ...INJECTED]
+const FULL_STATIC = [...new Set([...STATIC, ...INJECTED])]
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -27,7 +27,23 @@ self.addEventListener('fetch', e => {
   // Игнорируем расширения Chrome и прочие не http/https схемы
   if (!url.protocol.startsWith('http')) return
 
-  // API — только сеть, без кэша
+  // API GET requests — network first, fallback to cache
+  if (url.pathname.startsWith('/api/') && e.request.method === 'GET') {
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          if (res && res.status === 200) {
+            const clone = res.clone()
+            caches.open(CACHE).then(c => c.put(e.request, clone))
+          }
+          return res
+        })
+        .catch(() => caches.match(e.request).then(r => r || new Response('{"error":"offline"}', { headers: { 'Content-Type': 'application/json' } })))
+    )
+    return
+  }
+
+  // API POST/etc — network only
   if (url.pathname.startsWith('/api/')) {
     e.respondWith(fetch(e.request).catch(() => new Response('{"error":"offline"}', { headers: { 'Content-Type': 'application/json' } })))
     return

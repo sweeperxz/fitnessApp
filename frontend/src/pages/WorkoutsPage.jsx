@@ -160,14 +160,32 @@ export default function WorkoutsPage() {
   const [day, setDay] = useState(dayjs())
   const [workouts, setWorkouts] = useState([])
   const [modal, setModal] = useState(false)
+  const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const wd = getWeek(week)
 
   const load = useCallback(async () => {
-    try { setWorkouts(await getWorkouts({ from_date: wd[0].format('YYYY-MM-DD'), to_date: wd[6].format('YYYY-MM-DD') })) }
-    catch { setWorkouts([]) }
+    try { 
+      setWorkouts(await getWorkouts({ from_date: wd[0].format('YYYY-MM-DD'), to_date: wd[6].format('YYYY-MM-DD') })) 
+      setIsOffline(false)
+    }
+    catch(err) { 
+      if (err.isOffline || !navigator.onLine) setIsOffline(true)
+      setWorkouts([]) 
+    }
   }, [week, wd])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    const handleOnline = () => { setIsOffline(false); load() }
+    const handleOffline = () => setIsOffline(true)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [load])
 
   const dayWo = workouts.filter(w => w.day === day.format('YYYY-MM-DD'))
   const hasWo = d => workouts.some(w => w.day === d.format('YYYY-MM-DD'))
@@ -214,7 +232,17 @@ export default function WorkoutsPage() {
         </div>
       </div>
 
-      {dayWo.length === 0 ? (
+      {isOffline ? (
+        <div className="empty">
+          <div className="empty-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth={1.5} strokeLinecap="round">
+              <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.56 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01" />
+            </svg>
+          </div>
+          <div className="empty-title">{t('common.offline')}</div>
+          <div className="empty-text">{t('common.offline_desc')}</div>
+        </div>
+      ) : dayWo.length === 0 ? (
         <div className="empty">
           <div className="empty-icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth={1.5} strokeLinecap="round">
