@@ -1,7 +1,10 @@
 const CACHE = 'nutrio-v2'
-const STATIC = ['/', '/index.html']
+const STATIC = ['/']
 const INJECTED = (self.__WB_MANIFEST || []).map(e => e.url)
-const FULL_STATIC = [...new Set([...STATIC, ...INJECTED])]
+const FULL_STATIC = [...new Set([...STATIC, ...INJECTED])].filter(url => {
+  if (url === '/index.html' && INJECTED.includes('index.html')) return false
+  return true
+})
 
 self.addEventListener('install', e => {
   e.waitUntil(
