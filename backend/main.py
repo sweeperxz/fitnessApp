@@ -30,12 +30,13 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Nutrio API", version="2.1.0")
 
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+origins_list = [o.strip().rstrip('/') for o in cors_origins if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in cors_origins],
+    allow_origins=origins_list,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
