@@ -144,14 +144,14 @@ def get_nutrition(day: date, user: models.User = Depends(get_current_user), db: 
 @app.post("/nutrition/meal", response_model=schemas.Meal)
 def add_meal(data: schemas.MealCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     today = date.today()
-    nutrition_before = crud.get_nutrition_day(db, user.id, today)
+    calories_before = crud.get_daily_calories(db, user.id, today)
     profile = crud.get_profile(db, user.id)
     
     meal = crud.add_meal(db, user.id, data)
     
     if profile and profile.calories_goal:
-        nutrition_after = crud.get_nutrition_day(db, user.id, today)
-        if nutrition_before.total_calories < profile.calories_goal and nutrition_after.total_calories >= profile.calories_goal:
+        calories_after = calories_before + meal.calories
+        if calories_before < profile.calories_goal and calories_after >= profile.calories_goal:
             send_push_notification(db, user.id, "🎯 Отлично! Дневная цель по калориям достигнута!")
             
     return meal
@@ -163,14 +163,14 @@ def delete_meal(meal_id: int, user: models.User = Depends(get_current_user), db:
 @app.post("/nutrition/water", response_model=schemas.WaterLog)
 def log_water(data: schemas.WaterLogCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     today = date.today()
-    nutrition_before = crud.get_nutrition_day(db, user.id, today)
+    water_before = crud.get_daily_water(db, user.id, today)
     profile = crud.get_profile(db, user.id)
     
     water = crud.log_water(db, user.id, data)
     
     if profile and profile.water_goal:
-        nutrition_after = crud.get_nutrition_day(db, user.id, today)
-        if nutrition_before.water_ml < profile.water_goal and nutrition_after.water_ml >= profile.water_goal:
+        water_after = water_before + water.amount_ml
+        if water_before < profile.water_goal and water_after >= profile.water_goal:
             send_push_notification(db, user.id, "💧 Супер! Вы выпили дневную норму воды!")
             
     return water

@@ -1473,3 +1473,10 @@ textarea.input {
 .ob-card.active {
     border-color: var(--blue);
 }
+
+/* ─── iOS Mobile Zoom Fix ───────────────────────────────── */
+@media screen and (max-width: 768px) {
+    input, select, textarea {
+        font-size: 16px !important;
+    }
+}

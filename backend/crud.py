@@ -19,6 +19,22 @@ def upsert_profile(db: Session, user_id: int, data: schemas.ProfileCreate):
     return p
 
 # ── Nutrition ─────────────────────────────────────────────
+def get_daily_calories(db: Session, user_id: int, day: date) -> float:
+    from sqlalchemy import func
+    result = db.query(func.sum(models.Meal.calories)).filter(
+        models.Meal.user_id == user_id,
+        models.Meal.day == day
+    ).scalar()
+    return float(result) if result else 0.0
+
+def get_daily_water(db: Session, user_id: int, day: date) -> int:
+    from sqlalchemy import func
+    result = db.query(func.sum(models.WaterLog.amount_ml)).filter(
+        models.WaterLog.user_id == user_id,
+        models.WaterLog.day == day
+    ).scalar()
+    return int(result) if result else 0
+
 def get_nutrition_day(db: Session, user_id: int, day: date) -> schemas.NutritionDay:
     meals = db.query(models.Meal).filter(
         models.Meal.user_id == user_id,
