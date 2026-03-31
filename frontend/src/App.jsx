@@ -3,7 +3,8 @@ import { useTranslation, withTranslation } from 'react-i18next'
 import OnboardingPage from './pages/OnboardingPage'
 import AuthPage from './pages/AuthPage'
 // ... (rest of imports remains similar, but I'll provide the specific chunks)
-import { getToken, getMe, removeToken } from './api'
+import { getToken, removeToken } from './api'
+import AuthService from './services/AuthService'
 import OfflineToast from './components/OfflineToast'
 import useSwipe from './utils/useSwipe'
 import { tapHaptic, successHaptic, errorHaptic } from './utils/haptic'
@@ -168,22 +169,26 @@ export default function App() {
   const [status, setStatus] = useState(null) // null | auth | onboarding | app
   const [tab, setTab] = useState('today')
   const [role, setRole] = useState('user')
+  const [userName, setUserName] = useState('')
 
   useEffect(() => {
     const token = getToken()
     if (!token) return setStatus('auth')
-    getMe()
+    AuthService.getMe()
       .then(d => { 
         setStatus(d.has_profile ? 'app' : 'onboarding')
         setRole(d.role || 'user')
+        setUserName(d.name || '')
         localStorage.setItem('_nutrio_has_profile', d.has_profile ? '1' : '0')
         localStorage.setItem('_nutrio_role', d.role || 'user')
+        localStorage.setItem('_nutrio_user_name', d.name || '')
       })
       .catch((err) => {
         if (err.isOffline || !navigator.onLine) {
           const hp = localStorage.getItem('_nutrio_has_profile') === '1'
           setStatus(hp ? 'app' : 'onboarding')
           setRole(localStorage.getItem('_nutrio_role') || 'user')
+          setUserName(localStorage.getItem('_nutrio_user_name') || '')
         } else {
           removeToken()
           setStatus('auth')
@@ -240,7 +245,11 @@ export default function App() {
     </div>
   )
 
-  if (status === 'auth') return <AuthPage onAuth={d => { setStatus(d.has_profile ? 'app' : 'onboarding'); setRole(d.role || 'user') }} />
+  if (status === 'auth') return <AuthPage onAuth={d => { 
+    setStatus(d.has_profile ? 'app' : 'onboarding'); 
+    setRole(d.role || 'user');
+    setUserName(d.name || '');
+  }} />
   if (status === 'onboarding') return <OnboardingPage onDone={() => setStatus('app')} />
 
   const handleLogout = () => { removeToken(); setStatus('auth') }

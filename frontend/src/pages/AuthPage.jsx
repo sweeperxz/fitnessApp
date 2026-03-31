@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { googleAuth, register, login, setToken } from '../api'
+import { setToken } from '../api'
+import AuthService from '../services/AuthService'
 
 const G_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
@@ -42,7 +43,7 @@ export default function AuthPage({ onAuth }) {
         callback: async (resp) => {
           setLoading(true); setError('')
           try {
-            const data = await googleAuth({ credential: resp.credential })
+            const data = await AuthService.googleAuth({ credential: resp.credential })
             setToken(data.access_token)
             onAuth(data)
           } catch (e) {
@@ -77,8 +78,8 @@ export default function AuthPage({ onAuth }) {
     else if (!emailOk) { fe.email = true; setError(t('auth.errors.email_invalid')); setFieldErrors(fe); return }
     if (!form.password) fe.password = true
     if (sub === 'register' && !form.name.trim()) fe.name = true
-    if (sub === 'register' && form.password && form.password.length < 6) {
-      fe.password = true; setError(t('auth.errors.pass_short')); setFieldErrors(fe); return
+    if (sub === 'register' && form.password && form.password.length < 8) {
+      fe.password = true; setError(t('auth.errors.pass_short_8')); setFieldErrors(fe); return
     }
     if (Object.keys(fe).length) {
       setFieldErrors(fe); setError(t('auth.errors.all_fields')); return
@@ -86,7 +87,7 @@ export default function AuthPage({ onAuth }) {
     setFieldErrors({})
     setLoading(true)
     try {
-      const data = await (sub === 'register' ? register : login)(form)
+      const data = await (sub === 'register' ? AuthService.register : AuthService.login)(form)
       setToken(data.access_token)
       onAuth(data)
     } catch (e) { setError(e.response?.data?.detail || t('auth.errors.auth_error')) }

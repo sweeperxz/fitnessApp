@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
-import { getWorkouts, createWorkout, deleteWorkout } from '../api'
+import WorkoutService from '../services/WorkoutService'
 import { tapHaptic, mediumHaptic, successHaptic } from '../utils/haptic'
 
 const MUSCLE_KEYS = ['All', 'Chest', 'Back', 'Legs', 'Shoulders', 'Biceps', 'Triceps', 'Abs', 'Cardio']
@@ -74,11 +74,11 @@ function LibrarySheet({ onAdd, onClose }) {
   )
 }
 
-function NewWorkoutSheet({ onClose, onSave, day }) {
+function WorkoutFormSheet({ onClose, onSave, day, initialData }) {
   const { t } = useTranslation()
-  const [title, setTitle] = useState(t('workouts.add.title'))
-  const [exercises, setExercises] = useState([])
-  const [notes, setNotes] = useState('')
+  const [title, setTitle] = useState(initialData?.title || t('workouts.add.title'))
+  const [exercises, setExercises] = useState(initialData?.exercises || [])
+  const [notes, setNotes] = useState(initialData?.notes || '')
   const [lib, setLib] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -160,12 +160,13 @@ export default function WorkoutsPage() {
   const [day, setDay] = useState(dayjs())
   const [workouts, setWorkouts] = useState([])
   const [modal, setModal] = useState(false)
+  const [editWo, setEditWo] = useState(null)
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const wd = getWeek(week)
 
   const load = useCallback(async () => {
     try { 
-      setWorkouts(await getWorkouts({ from_date: wd[0].format('YYYY-MM-DD'), to_date: wd[6].format('YYYY-MM-DD') })) 
+      setWorkouts(await WorkoutService.getWorkouts({ from_date: wd[0].format('YYYY-MM-DD'), to_date: wd[6].format('YYYY-MM-DD') })) 
       setIsOffline(false)
     }
     catch(err) { 
@@ -259,9 +260,19 @@ export default function WorkoutsPage() {
               <div className="workout-card-title">{w.title}</div>
               {w.notes && <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 3 }}>{w.notes}</div>}
             </div>
-            <button className="workout-card-del" onClick={() => { mediumHaptic(); deleteWorkout(w.id).then(() => { successHaptic(); load(); }) }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="workout-card-edit" onClick={() => { tapHaptic(); setEditWo(w); setModal(true) }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+              </button>
+              <button className="workout-card-del" onClick={() => { 
+                mediumHaptic(); 
+                if (window.confirm(t('common.confirm_delete'))) {
+                  WorkoutService.deleteWorkout(w.id).then(() => { successHaptic(); load(); })
+                }
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
           </div>
           {w.exercises.map(e => (
             <div key={e.id} className="exercise-row">
@@ -277,13 +288,27 @@ export default function WorkoutsPage() {
 
       {createPortal(
         <>
-          <button className="fab" onClick={() => { mediumHaptic(); setModal(true) }}>
+          <button className="fab" onClick={() => { mediumHaptic(); setEditWo(null); setModal(true) }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
           </button>
-          {modal && <NewWorkoutSheet onClose={() => setModal(false)} onSave={d => { successHaptic(); return createWorkout(d).then(w => { load(); return w }) }} day={day} />}
+          {modal && (
+            <WorkoutFormSheet 
+              initialData={editWo}
+              onClose={() => setModal(false)} 
+              onSave={d => { 
+                successHaptic(); 
+                const promise = editWo 
+                  ? WorkoutService.updateWorkout(editWo.id, d)
+                  : WorkoutService.createWorkout(d)
+                return promise.then(res => { load(); return res })
+              }} 
+              day={day} 
+            />
+          )}
         </>,
         document.body
       )}
     </>
   )
 }
+

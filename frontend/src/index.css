@@ -723,16 +723,21 @@ textarea.input {
     font-weight: 700;
 }
 
-.workout-card-del {
+.workout-card-del, .workout-card-edit {
     background: none;
     border: none;
     color: var(--text3);
     cursor: pointer;
     padding: 2px;
+    transition: color 0.2s;
 }
 
 .workout-card-del:active {
     color: var(--red);
+}
+
+.workout-card-edit:active {
+    color: var(--blue2);
 }
 
 .exercise-row {
@@ -1479,4 +1484,75 @@ textarea.input {
     input, select, textarea {
         font-size: 16px !important;
     }
+}
+
+/* ─── Application Header ─────────────────────────────────── */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header-logo {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.5px;
+}
+
+.header-logo .accent {
+  color: var(--blue2);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-welcome {
+  font-size: 11px;
+  color: var(--text2);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.user-welcome span {
+  color: var(--text);
+}
+
+.logout-btn {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.logout-btn:hover {
+  background: rgba(248, 113, 113, 0.1);
+  color: var(--red);
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+.logout-btn svg {
+  width: 18px;
+  height: 18px;
 }
