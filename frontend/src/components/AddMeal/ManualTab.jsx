@@ -6,7 +6,7 @@ import { addRecentFood } from '../../api'
 export default function ManualTab({ initial, onAdd, onClose }) {
     const { t } = useTranslation()
     const [form, setForm] = useState({
-        meal_type: t('meals.Breakfast'),
+        meal_type: 'Breakfast',
         name: '', calories: '', protein: '', fat: '', carbs: '', weight: '100',
         ...(initial || {}),
     })
@@ -95,31 +95,31 @@ export default function ManualTab({ initial, onAdd, onClose }) {
 
             <div className="input-row">
                 <div>
-                    <div className="input-label">{isPer100Mode ? 'Ккал в 100г' : 'Ккал в порции'} *</div>
+                    <div className="input-label">{t(isPer100Mode ? 'meals.manual_kcal_in_100' : 'meals.manual_kcal_in_portion')} *</div>
                     <input className="input" type="number" inputMode="decimal" placeholder="0"
                         value={form.calories} onChange={e => upd('calories', e.target.value)} />
                 </div>
                 <div>
-                    <div className="input-label">{isPer100Mode ? 'Белки в 100г' : 'Белки в порции'} (г)</div>
+                    <div className="input-label">{t(isPer100Mode ? 'meals.manual_protein_in_100' : 'meals.manual_protein_in_portion')}</div>
                     <input className="input" type="number" inputMode="decimal" placeholder="0"
                         value={form.protein} onChange={e => upd('protein', e.target.value)} />
                 </div>
             </div>
             <div className="input-row">
                 <div>
-                    <div className="input-label">{isPer100Mode ? 'Жиры в 100г' : 'Жиры в порции'} (г)</div>
+                    <div className="input-label">{t(isPer100Mode ? 'meals.manual_fat_in_100' : 'meals.manual_fat_in_portion')}</div>
                     <input className="input" type="number" inputMode="decimal" placeholder="0"
                         value={form.fat} onChange={e => upd('fat', e.target.value)} />
                 </div>
                 <div>
-                    <div className="input-label">{isPer100Mode ? 'Углев. в 100г' : 'Углеводы в порции'} (г)</div>
+                    <div className="input-label">{t(isPer100Mode ? 'meals.manual_carbs_in_100' : 'meals.manual_carbs_in_portion')}</div>
                     <input className="input" type="number" inputMode="decimal" placeholder="0"
                         value={form.carbs} onChange={e => upd('carbs', e.target.value)} />
                 </div>
             </div>
 
             <button className="btn-primary" onClick={submit} disabled={!form.name || !form.calories} style={{ marginTop: 8 }}>
-                Добавить
+                {t('common.save')}
             </button>
         </>
     )

@@ -34,14 +34,14 @@ class UserRoleUpdate(BaseModel):
 
 # ── Profile ───────────────────────────────────────────────
 class ProfileCreate(BaseModel):
-    weight: float = Field(default=70, ge=1, le=1000)
-    goal: str = "maintain"
-    activity: str = "medium"
-    water_goal: int = Field(default=2500, ge=0, le=20000)
-    calories_goal: int = Field(default=2000, ge=0, le=30000)
-    protein_goal: int = Field(default=150, ge=0, le=2000)
-    fat_goal: int = Field(default=70, ge=0, le=2000)
-    carbs_goal: int = Field(default=250, ge=0, le=5000)
+    weight: float = Field(..., gt=0, le=500, description="Вес в кг")
+    goal: str = Field(..., pattern="^(lose|maintain|gain)$", description="Цель: lose, maintain, gain")
+    activity: str = Field(..., pattern="^(low|medium|high)$", description="Активность: low, medium, high")
+    water_goal: int = Field(..., ge=0, le=20000, description="Цель по воде в мл")
+    calories_goal: int = Field(..., ge=0, le=10000, description="Цель по калориям")
+    protein_goal: int = Field(..., ge=0, le=500, description="Цель по белкам в г")
+    fat_goal: int = Field(..., ge=0, le=500, description="Цель по жирам в г")
+    carbs_goal: int = Field(..., ge=0, le=1000, description="Цель по углеводам в г")
 
 class Profile(ProfileCreate):
     id: int

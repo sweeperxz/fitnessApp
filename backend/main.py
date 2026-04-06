@@ -1,23 +1,21 @@
-import os
 from datetime import date, datetime
 from typing import Optional
 
 import httpx
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from google.oauth2 import id_token
 from google.auth.transport import requests as g_requests
-
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 import models, schemas, crud
 from database import SessionLocal, engine
 from auth import get_db, get_current_user, get_admin_user, hash_password, verify_password, create_token
+from config import settings
+from routers import profile
 
 try:
     from pywebpush import webpush, WebPushException
@@ -27,19 +25,22 @@ except ImportError:
 
 models.Base.metadata.create_all(bind=engine)
 
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Nutrio API", version="2.1.0")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
-origins_list = [o.strip().rstrip('/') for o in cors_origins if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins_list,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+# ── Routers ───────────────────────────────────────────────
+app.include_router(profile.router)
 
 # ── Health ────────────────────────────────────────────────
 @app.get("/health")
@@ -57,7 +58,8 @@ def register(data: schemas.RegisterRequest, db: Session = Depends(get_db)):
     return schemas.TokenResponse(access_token=create_token(user.id), user_id=user.id, name=user.name, email=user.email, role=user.role, has_profile=False)
 
 @app.post("/auth/login", response_model=schemas.TokenResponse)
-def login(data: schemas.LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/5minutes")
+def login(request: Request, data: schemas.LoginRequest, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == data.email.lower()).first()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(401, "Неверный email или пароль")
@@ -69,9 +71,9 @@ def login(data: schemas.LoginRequest, db: Session = Depends(get_db)):
 def google_auth(data: schemas.GoogleAuthRequest, db: Session = Depends(get_db)):
     """Принимает id_token от Google Sign-In и возвращает наш JWT"""
     try:
-        if not GOOGLE_CLIENT_ID:
+        if not settings.GOOGLE_CLIENT_ID:
             raise HTTPException(500, "Google OAuth не настроен: задайте GOOGLE_CLIENT_ID")
-        info = id_token.verify_oauth2_token(data.credential, g_requests.Request(), GOOGLE_CLIENT_ID)
+        info = id_token.verify_oauth2_token(data.credential, g_requests.Request(), settings.GOOGLE_CLIENT_ID)
         
         email = info.get("email", "").lower()
         name  = info.get("name", "")
@@ -202,8 +204,7 @@ def get_stats(days: int = 30, user: models.User = Depends(get_current_user), db:
 # ── AI Assistant (Gemini) ─────────────────────────────────
 @app.post("/ai/chat")
 async def ai_chat(data: schemas.ChatRequest, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
+    if not settings.GEMINI_API_KEY:
         raise HTTPException(500, "GEMINI_API_KEY не настроен на сервере")
 
     # 1. Получаем профиль для системного промпта
@@ -238,7 +239,7 @@ async def ai_chat(data: schemas.ChatRequest, user: models.User = Depends(get_cur
     url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
     # 4. Отправляем запрос
-    headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
+    headers = {"x-goog-api-key": settings.GEMINI_API_KEY, "Content-Type": "application/json"}
     async with httpx.AsyncClient() as client:
         try:
             res = await client.post(url, json=payload, headers=headers, timeout=30.0)
@@ -290,12 +291,8 @@ def add_recent_food(data: schemas.FoodItemCreate, user: models.User = Depends(ge
 
 
 # ── Push Notifications ────────────────────────────────────
-VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY")
-VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY")
-VAPID_EMAIL = os.getenv("VAPID_EMAIL", "mailto:test@example.com")
-
 def send_push_notification(db: Session, user_id: int, message: str):
-    if not webpush or not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
+    if not webpush or not settings.VAPID_PRIVATE_KEY or not settings.VAPID_PUBLIC_KEY:
         return
     subs = crud.get_push_subscriptions(db, user_id)
     for s in subs:
@@ -303,8 +300,8 @@ def send_push_notification(db: Session, user_id: int, message: str):
             webpush(
                 subscription_info={"endpoint": s.endpoint, "keys": {"p256dh": s.p256dh, "auth": s.auth}},
                 data=message,
-                vapid_private_key=VAPID_PRIVATE_KEY,
-                vapid_claims={"sub": VAPID_EMAIL if VAPID_EMAIL.startswith(("mailto:", "https://")) else f"mailto:{VAPID_EMAIL}"}
+                vapid_private_key=settings.VAPID_PRIVATE_KEY,
+                vapid_claims={"sub": settings.VAPID_EMAIL if settings.VAPID_EMAIL.startswith(("mailto:", "https://")) else f"mailto:{settings.VAPID_EMAIL}"}
             )
         except Exception:
             pass
@@ -312,9 +309,9 @@ def send_push_notification(db: Session, user_id: int, message: str):
 
 @app.get("/push/vapid-public-key")
 def get_vapid_public_key():
-    if not VAPID_PUBLIC_KEY:
+    if not settings.VAPID_PUBLIC_KEY:
         raise HTTPException(500, "VAPID_PUBLIC_KEY не настроен")
-    return {"public_key": VAPID_PUBLIC_KEY}
+    return {"public_key": settings.VAPID_PUBLIC_KEY}
 
 
 @app.post("/push/subscribe")
@@ -328,7 +325,7 @@ def subscribe(data: schemas.PushSubscriptionCreate, user: models.User = Depends(
 def test_push(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not webpush:
         raise HTTPException(500, "библиотека pywebpush не установлена")
-    if not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
+    if not settings.VAPID_PRIVATE_KEY or not settings.VAPID_PUBLIC_KEY:
         raise HTTPException(500, f"VAPID ключи не настроены. Добавьте VAPID_PRIVATE_KEY и VAPID_PUBLIC_KEY в .env")
 
     subs = crud.get_push_subscriptions(db, user.id)
@@ -344,8 +341,8 @@ def test_push(user: models.User = Depends(get_current_user), db: Session = Depen
                     "keys": {"p256dh": s.p256dh, "auth": s.auth}
                 },
                 data="Привет от Nutrio! Уведомления работают 🎉",
-                vapid_private_key=VAPID_PRIVATE_KEY,
-                vapid_claims={"sub": VAPID_EMAIL if VAPID_EMAIL.startswith(("mailto:", "https://")) else f"mailto:{VAPID_EMAIL}"}
+                vapid_private_key=settings.VAPID_PRIVATE_KEY,
+                vapid_claims={"sub": settings.VAPID_EMAIL if settings.VAPID_EMAIL.startswith(("mailto:", "https://")) else f"mailto:{settings.VAPID_EMAIL}"}
             )
             results.append({"endpoint": s.endpoint, "status": "sent"})
         except WebPushException as ex:

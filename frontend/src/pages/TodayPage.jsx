@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactDOM from 'react-dom'
 import dayjs from 'dayjs'
-import 'dayjs/locale/ru'
+import 'dayjs/locale/en'
+import 'dayjs/locale/uk'
 import {
   getNutritionDay, addMeal, deleteMeal,
   logWater, getProfile, sendChatMessage,
@@ -11,8 +12,14 @@ import { tapHaptic, mediumHaptic, successHaptic } from '../utils/haptic'
 import { MEAL_TYPES, MealIcons } from '../utils/constants'
 import Ring from '../components/Ring'
 import AddModal from '../components/AddMeal/AddModal'
-
-dayjs.locale('ru')
+import {
+  saveOfflineData,
+  getOfflineData,
+  markAsSynced,
+  addPendingSync,
+  getPendingSync,
+  removePendingSync
+} from '../utils/offlineStorage'
 
 // Глобальный кэш для ИИ-советов, чтобы они не пропадали при переходе на другие вкладки
 const globalAiTipsCache = {}
@@ -26,11 +33,30 @@ export default function TodayPage() {
   const [modal, setModal] = useState(false)
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
 
+  // Set dayjs locale based on i18n language
+  useEffect(() => {
+    dayjs.locale(i18n.language === 'en' ? 'en' : 'uk')
+  }, [i18n.language])
+
   // Инициализируем стейт из кэша для текущего дня (по умолчанию сегодня)
   const initDateStr = dayjs().format('YYYY-MM-DD')
   const [tipsOpen, setTipsOpen] = useState(() => globalAiTipsCache[initDateStr]?.open || false)
   const [aiTips, setAiTips] = useState(() => globalAiTipsCache[initDateStr]?.tips || null)
   const [tipsLoading, setTipsLoading] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [hasUnsyncedData, setHasUnsyncedData] = useState(false)
+  const [showSyncSuccess, setShowSyncSuccess] = useState(false)
+
+  // Проверка несинхронизированных данных
+  useEffect(() => {
+    const checkUnsynced = () => {
+      const pending = getPendingSync()
+      setHasUnsyncedData(pending.length > 0)
+    }
+    checkUnsynced()
+    const interval = setInterval(checkUnsynced, 5000)
+    return () => clearInterval(interval)
+  }, [])
 
   const fb = { calories_goal: 2000, protein_goal: 150, fat_goal: 70, carbs_goal: 250, water_goal: 2500 }
 
@@ -43,18 +69,128 @@ export default function TodayPage() {
       setData(nd)
       setProfile(pr)
       setIsOffline(false)
+
+      // Сохраняем в локальное хранилище
+      saveOfflineData(`nutrition_${day.format('YYYY-MM-DD')}`, nd)
+      saveOfflineData('profile', pr)
+      markAsSynced(`nutrition_${day.format('YYYY-MM-DD')}`)
+      markAsSynced('profile')
     } catch (err) {
-      if (err.isOffline || !navigator.onLine) setIsOffline(true)
-      setData({ meals: [], total_calories: 0, total_protein: 0, total_fat: 0, total_carbs: 0, water_ml: 0 })
-      setProfile(fb)
+      if (err.isOffline || !navigator.onLine) {
+        setIsOffline(true)
+
+        // Загружаем из локального хранилища
+        const cachedNutrition = getOfflineData(`nutrition_${day.format('YYYY-MM-DD')}`)
+        const cachedProfile = getOfflineData('profile')
+
+        if (cachedNutrition) {
+          setData(cachedNutrition.data)
+        } else {
+          setData({ meals: [], total_calories: 0, total_protein: 0, total_fat: 0, total_carbs: 0, water_ml: 0 })
+        }
+
+        if (cachedProfile) {
+          setProfile(cachedProfile.data)
+        } else {
+          setProfile(fb)
+        }
+      } else {
+        setData({ meals: [], total_calories: 0, total_protein: 0, total_fat: 0, total_carbs: 0, water_ml: 0 })
+        setProfile(fb)
+      }
     }
   }, [day])
+
+  const addWaterWithValidation = useCallback(async (ml) => {
+    const MAX_DAILY_WATER = 10000 // 10 литров - максимум в день
+    const MAX_SINGLE_INTAKE = 2000 // 2 литра - максимум за раз
+
+    // Проверка разовой порции
+    if (ml > MAX_SINGLE_INTAKE) {
+      alert(t('today.water_warning_single') || `⚠️ Warning: Drinking more than ${MAX_SINGLE_INTAKE}ml at once can be dangerous. Please add smaller portions.`)
+      return
+    }
+
+    // Проверка дневного лимита
+    const newTotal = (data?.water_ml || 0) + ml
+    if (newTotal > MAX_DAILY_WATER) {
+      alert(t('today.water_warning_daily') || `⚠️ Warning: Total water intake would exceed ${MAX_DAILY_WATER}ml (${MAX_DAILY_WATER/1000}L) per day, which can be dangerous. Current: ${data?.water_ml || 0}ml`)
+      return
+    }
+
+    tapHaptic()
+
+    if (isOffline) {
+      // Оффлайн режим: сохраняем локально
+      addPendingSync({
+        type: 'logWater',
+        data: { day: day.format('YYYY-MM-DD'), amount_ml: ml }
+      })
+
+      // Обновляем UI локально
+      setData(prev => ({
+        ...prev,
+        water_ml: prev.water_ml + ml
+      }))
+
+      setHasUnsyncedData(true)
+      successHaptic()
+    } else {
+      // Онлайн режим: отправляем на сервер
+      await logWater({ day: day.format('YYYY-MM-DD'), amount_ml: ml })
+      successHaptic()
+      load()
+    }
+  }, [data, day, load, t, isOffline])
 
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
-    const handleOnline = () => { setIsOffline(false); load() }
+    const handleOnline = async () => {
+      setIsOffline(false)
+
+      // Автоматическая синхронизация при восстановлении соединения
+      setSyncing(true)
+      try {
+        const pending = getPendingSync()
+
+        for (const operation of pending) {
+          try {
+            if (operation.type === 'addMeal') {
+              await addMeal(operation.data)
+            } else if (operation.type === 'deleteMeal') {
+              await deleteMeal(operation.data.id)
+            } else if (operation.type === 'logWater') {
+              await logWater(operation.data)
+            }
+            removePendingSync(operation.id)
+          } catch (e) {
+            console.error('Failed to sync operation:', e)
+          }
+        }
+
+        // Перезагружаем данные после синхронизации
+        await load()
+        setHasUnsyncedData(false)
+
+        // Показываем уведомление об успешной синхронизации
+        if (pending.length > 0) {
+          successHaptic()
+          setShowSyncSuccess(true)
+
+          // Автоматически скрываем через 3 секунды
+          setTimeout(() => {
+            setShowSyncSuccess(false)
+          }, 3000)
+        }
+      } catch (e) {
+        console.error('Sync failed:', e)
+      }
+      setSyncing(false)
+    }
+
     const handleOffline = () => setIsOffline(true)
+
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
     return () => {
@@ -158,6 +294,84 @@ export default function TodayPage() {
         </div>
       </div>
 
+      {/* Индикатор оффлайн режима */}
+      {isOffline && (
+        <div style={{
+          background: 'rgba(251, 146, 60, 0.1)',
+          border: '1px solid rgba(251, 146, 60, 0.3)',
+          borderRadius: 'var(--r)',
+          padding: '12px 16px',
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          animation: 'fade-in 0.3s ease'
+        }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth={2} strokeLinecap="round">
+            <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" />
+          </svg>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#fb923c', marginBottom: 2 }}>
+              {t('common.offline')}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text2)' }}>
+              {hasUnsyncedData
+                ? t('common.offline_toast')
+                : t('common.offline_desc')}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Индикатор синхронизации */}
+      {syncing && (
+        <div style={{
+          background: 'rgba(59, 130, 246, 0.1)',
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          borderRadius: 'var(--r)',
+          padding: '12px 16px',
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          animation: 'fade-in 0.3s ease'
+        }}>
+          <div style={{
+            width: 18,
+            height: 18,
+            border: '2px solid rgba(59, 130, 246, 0.3)',
+            borderTopColor: '#3b82f6',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite'
+          }} />
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#3b82f6' }}>
+            {t('common.syncing') || 'Синхронізація...'}
+          </div>
+        </div>
+      )}
+
+      {/* Индикатор несинхронизированных данных */}
+      {showSyncSuccess && (
+        <div style={{
+          background: 'rgba(34, 197, 94, 0.1)',
+          border: '1px solid rgba(34, 197, 94, 0.3)',
+          borderRadius: 'var(--r)',
+          padding: '12px 16px',
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          animation: 'fade-in 0.3s ease'
+        }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth={2} strokeLinecap="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#22c55e' }}>
+            {t('common.synced_toast')}
+          </div>
+        </div>
+      )}
+
       {/* Калории + макросы */}
       <div className="card" style={{ '--i': 0 }}>
         {!data
@@ -224,7 +438,7 @@ export default function TodayPage() {
         <div className="water-btns">
           {[100, 200, 250, 500].map(ml => (
             <button key={ml} className="water-btn"
-              onClick={() => { tapHaptic(); logWater({ day: day.format('YYYY-MM-DD'), amount_ml: ml }).then(() => { successHaptic(); load(); }) }}>
+              onClick={() => addWaterWithValidation(ml)}>
               +{ml}
             </button>
           ))}
@@ -334,9 +548,41 @@ export default function TodayPage() {
           {modal && (
             <AddModal
               onClose={() => setModal(false)}
-              onAdd={meal => {
+              onAdd={async (meal) => {
                 successHaptic()
-                return addMeal({ ...meal, day: day.format('YYYY-MM-DD') }).then(load)
+
+                if (isOffline) {
+                  // Оффлайн режим: сохраняем локально
+                  addPendingSync({
+                    type: 'addMeal',
+                    data: { ...meal, day: day.format('YYYY-MM-DD') }
+                  })
+
+                  // Обновляем UI локально
+                  const newMeal = {
+                    ...meal,
+                    id: Date.now(),
+                    meal_type: meal.meal_type,
+                    created_at: new Date().toISOString()
+                  }
+
+                  setData(prev => ({
+                    ...prev,
+                    meals: [...prev.meals, newMeal],
+                    total_calories: prev.total_calories + meal.calories,
+                    total_protein: prev.total_protein + (meal.protein || 0),
+                    total_fat: prev.total_fat + (meal.fat || 0),
+                    total_carbs: prev.total_carbs + (meal.carbs || 0)
+                  }))
+
+                  setHasUnsyncedData(true)
+                  setModal(false)
+                } else {
+                  // Онлайн режим: отправляем на сервер
+                  await addMeal({ ...meal, day: day.format('YYYY-MM-DD') })
+                  await load()
+                  setModal(false)
+                }
               }}
             />
           )}

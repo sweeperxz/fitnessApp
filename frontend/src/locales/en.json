@@ -16,6 +16,7 @@
         "saved": "Saved",
         "offline_toast": "No network · saved locally",
         "offline_toast_desc": "No internet connection",
+        "syncing": "Syncing...",
         "synced_toast": "Synced ✓"
     },
     "nav": {
@@ -37,6 +38,8 @@
         "remaining": "Remaining",
         "water": "Water",
         "ml": "ml",
+        "water_warning_single": "⚠️ Warning: Drinking more than 2L at once can be dangerous. Please add smaller portions.",
+        "water_warning_daily": "⚠️ Warning: Total water intake would exceed 10L per day, which can be dangerous.",
         "ai_tips": "AI Nutrition Tips",
         "generating_tips": "Generating personal tips...",
         "meals": "Meals",
@@ -107,6 +110,8 @@
         "push": "Push Notifications",
         "push_on": "Enabled",
         "push_off": "Disabled",
+        "push_error": "Failed to enable notifications. Check browser permissions.",
+        "push_test_success": "✅ Test notification sent!",
         "test_push": "Send test push",
         "about": "About App",
         "version": "Version",
@@ -255,11 +260,14 @@
             "name_ph": "What is your name?",
             "email": "Email",
             "password": "Password",
-            "password_ph": "Min 6 characters"
+            "password_ph": "Min 6 characters",
+            "confirm_password": "Confirm Password",
+            "confirm_password_ph": "Repeat password"
         },
         "errors": {
             "email_invalid": "Enter valid email",
             "pass_short": "Password — min 6 characters",
+            "pass_mismatch": "Passwords don't match",
             "all_fields": "Fill all required fields",
             "auth_error": "Auth error"
         },

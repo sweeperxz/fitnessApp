@@ -8,13 +8,6 @@ import { getSubscription, subscribeUser, unsubscribeUser, checkPushSupport } fro
 const GOALS = [{ v: 'lose', lKey: 'goals.lose' }, { v: 'maintain', lKey: 'goals.maintain' }, { v: 'gain', lKey: 'goals.gain' }]
 const ACTS = [{ v: 'low', lKey: 'activity.low' }, { v: 'medium', lKey: 'activity.medium' }, { v: 'high', lKey: 'activity.high' }]
 
-function calc(w, goal, act) {
-  const p = Math.round(+w * 2), f = Math.round(+w * 1)
-  let kcal = (+w * 10 + 6.25 * 175 - 5 * 30 + 5) * { low: 1.2, medium: 1.55, high: 1.725 }[act]
-  if (goal === 'lose') kcal -= 400; if (goal === 'gain') kcal += 300
-  return { calories_goal: Math.round(kcal), protein_goal: p, fat_goal: f, carbs_goal: Math.max(Math.round((kcal - p * 4 - f * 9) / 4), 50), water_goal: Math.round(+w * 30) }
-}
-
 export default function ProfilePage({ onLogout }) {
   const { t, i18n } = useTranslation()
   const [form, setForm] = useState({ weight: 70, goal: 'maintain', activity: 'medium', water_goal: 2500, calories_goal: 2000, protein_goal: 150, fat_goal: 70, carbs_goal: 250 })
@@ -24,6 +17,7 @@ export default function ProfilePage({ onLogout }) {
   const [themeMode, setThemeMode] = useState(getTheme())
   const [pushSupported, setPushSupported] = useState(false)
   const [isSubscribed, setIsSubscribed] = useState(false)
+  const [calculating, setCalculating] = useState(false)
 
   useEffect(() => {
     checkPushSupport().then(setPushSupported)
@@ -48,7 +42,8 @@ export default function ProfilePage({ onLogout }) {
         successHaptic()
       } catch (err) {
         console.error('Push subscription failed:', err)
-        alert('Не удалось включить уведомления. Проверь разрешения браузера.')
+        const errorMsg = err.response?.data?.detail || t('profile.push_error') || 'Failed to enable notifications. Check browser permissions.'
+        alert(errorMsg)
       }
     }
   }
@@ -57,13 +52,22 @@ export default function ProfilePage({ onLogout }) {
     try {
       await api.post('/push/test')
       successHaptic()
+      alert(t('profile.push_test_success') || '✅ Test notification sent!')
     } catch (err) {
       console.error('Push test failed:', err)
-      alert(err.response?.data?.detail || 'Ошибка при отправке теста')
+      const errorMsg = err.response?.data?.detail || err.message
+      alert(errorMsg)
     }
   }
 
-  const upd = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const upd = (k, v) => {
+    // Валидация: запрещаем отрицательные значения для числовых полей
+    if (['weight', 'water_goal', 'calories_goal', 'protein_goal', 'fat_goal', 'carbs_goal'].includes(k)) {
+      const numVal = parseFloat(v)
+      if (numVal < 0 || isNaN(numVal)) return
+    }
+    setForm(f => ({ ...f, [k]: v }))
+  }
 
   const save = async () => {
     await upsertProfile(form)
@@ -111,7 +115,7 @@ export default function ProfilePage({ onLogout }) {
           <div className="card-label">{t('profile.main_data')}</div>
           <div className="form-group">
             <div className="input-label">{t('profile.weight')}</div>
-            <input className="input" type="number" inputMode="decimal" value={form.weight} onChange={e => upd('weight', e.target.value)} />
+            <input className="input" type="number" inputMode="decimal" min="0" step="0.1" value={form.weight} onChange={e => upd('weight', e.target.value)} />
           </div>
           <div className="form-group">
             <div className="input-label">{t('profile.goal')}</div>
@@ -133,24 +137,44 @@ export default function ProfilePage({ onLogout }) {
               ))}
             </div>
           </div>
-          <button onClick={() => { successHaptic(); setForm(f => ({ ...f, ...calc(f.weight, f.goal, f.activity) })); }} style={{
+          <button onClick={async () => {
+            setCalculating(true)
+            try {
+              const { data } = await api.post('/profile/calculate-goals', {
+                weight: form.weight,
+                height: 175,
+                age: 30,
+                gender: 'male',
+                goal: form.goal,
+                activity: form.activity
+              })
+              setForm(f => ({ ...f, ...data }))
+              successHaptic()
+            } catch (err) {
+              console.error('Calculation failed:', err)
+              alert('Ошибка расчета целей')
+            } finally {
+              setCalculating(false)
+            }
+          }} disabled={calculating} style={{
             width: '100%', padding: '11px 0', borderRadius: 'var(--r-sm)',
             border: '1px solid var(--blue)', background: 'var(--blue-glow)',
             color: 'var(--blue)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-          }}>{t('profile.recalculate')}</button>
+            opacity: calculating ? 0.6 : 1
+          }}>{calculating ? t('common.loading') || 'Расчет...' : t('profile.recalculate')}</button>
         </div>
 
         <div className="card">
           <div className="card-label">{t('profile.macros_goals')}</div>
           <div className="input-row">
-            <div><div className="input-label">{t('today.calories')}</div><input className="input" type="number" value={form.calories_goal} onChange={e => upd('calories_goal', +e.target.value)} /></div>
-            <div><div className="input-label">{t('today.protein')} г</div><input className="input" type="number" value={form.protein_goal} onChange={e => upd('protein_goal', +e.target.value)} /></div>
+            <div><div className="input-label">{t('today.calories')}</div><input className="input" type="number" min="0" value={form.calories_goal} onChange={e => upd('calories_goal', +e.target.value)} /></div>
+            <div><div className="input-label">{t('today.protein')} г</div><input className="input" type="number" min="0" value={form.protein_goal} onChange={e => upd('protein_goal', +e.target.value)} /></div>
           </div>
           <div className="input-row">
-            <div><div className="input-label">{t('today.fat')} г</div><input className="input" type="number" value={form.fat_goal} onChange={e => upd('fat_goal', +e.target.value)} /></div>
-            <div><div className="input-label">{t('today.carbs')} г</div><input className="input" type="number" value={form.carbs_goal} onChange={e => upd('carbs_goal', +e.target.value)} /></div>
+            <div><div className="input-label">{t('today.fat')} г</div><input className="input" type="number" min="0" value={form.fat_goal} onChange={e => upd('fat_goal', +e.target.value)} /></div>
+            <div><div className="input-label">{t('today.carbs')} г</div><input className="input" type="number" min="0" value={form.carbs_goal} onChange={e => upd('carbs_goal', +e.target.value)} /></div>
           </div>
-          <div className="form-group"><div className="input-label">{t('today.water')} (мл)</div><input className="input" type="number" value={form.water_goal} onChange={e => upd('water_goal', +e.target.value)} /></div>
+          <div className="form-group"><div className="input-label">{t('today.water')} (мл)</div><input className="input" type="number" min="0" value={form.water_goal} onChange={e => upd('water_goal', +e.target.value)} /></div>
         </div>
 
         <button className="btn-primary" onClick={save} style={{ marginBottom: 8 }}>
@@ -193,7 +217,6 @@ export default function ProfilePage({ onLogout }) {
                 outline: 'none',
               }}
             >
-              <option value="ru">Русский</option>
               <option value="en">English</option>
               <option value="uk">Українська</option>
             </select>

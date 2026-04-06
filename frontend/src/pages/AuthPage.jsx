@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { googleAuth, register, login, setToken } from '../api'
+import { useFormValidation } from '../hooks/useFormValidation'
 
 const G_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
@@ -17,22 +18,52 @@ function loadGSI(callback) {
 
 export default function AuthPage({ onAuth }) {
   const { t, i18n } = useTranslation()
-  const [mode, setMode] = useState('google')
   const [sub, setSub] = useState('login')
-  const [form, setForm] = useState({ email: '', password: '', name: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [fieldErrors, setFieldErrors] = useState({})
   const [gReady, setGReady] = useState(false)
 
   const btnRef = useRef(null)
   const wrapperRef = useRef(null)
 
-  const upd = (k, v) => {
-    setForm(f => ({ ...f, [k]: v }))
-    if (fieldErrors[k]) setFieldErrors(fe => ({ ...fe, [k]: false }))
+  // Validation rules based on mode
+  const validationRules = useMemo(() => ({
+    email: { type: 'email' },
+    password: { type: 'password', params: [6] },
+    ...(sub === 'register' && {
+      name: { type: 'name' },
+      confirmPassword: (value, values) => {
+        if (!value) return t('auth.errors.all_fields')
+        if (value !== values.password) return t('auth.errors.pass_mismatch') || 'Пароли не совпадают'
+        return null
+      }
+    })
+  }), [sub, t])
+
+  const {
+    values: form,
+    errors: fieldErrors,
+    touched,
+    setValue,
+    setFieldTouched,
+    validateAll,
+    reset,
+    isValid
+  } = useFormValidation(
+    { email: '', password: '', confirmPassword: '', name: '' },
+    validationRules
+  )
+
+  const upd = useCallback((k, v) => {
+    setValue(k, v)
     setError('')
-  }
+  }, [setValue])
+
+  const switchMode = useCallback((newMode) => {
+    setSub(newMode)
+    reset()
+    setError('')
+  }, [reset])
 
   useEffect(() => {
     if (!G_CLIENT_ID) return
@@ -64,34 +95,29 @@ export default function AuthPage({ onAuth }) {
       size: 'large',
       text: 'signin_with',
       shape: 'rectangular',
-      locale: i18n.language === 'en' ? 'en' : i18n.language === 'uk' ? 'uk' : 'ru',
+      locale: i18n.language === 'en' ? 'en' : 'uk',
       width: wrapperRef.current.offsetWidth || 340,
     })
-  }, [gReady, mode, i18n.language, t])
+  }, [gReady, i18n.language, t])
 
-  const submitEmail = async () => {
+  const submitEmail = useCallback(async () => {
     setError('')
-    const fe = {}
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
-    if (!form.email.trim()) fe.email = true
-    else if (!emailOk) { fe.email = true; setError(t('auth.errors.email_invalid')); setFieldErrors(fe); return }
-    if (!form.password) fe.password = true
-    if (sub === 'register' && !form.name.trim()) fe.name = true
-    if (sub === 'register' && form.password && form.password.length < 6) {
-      fe.password = true; setError(t('auth.errors.pass_short')); setFieldErrors(fe); return
+
+    if (!validateAll()) {
+      setError(t('auth.errors.all_fields'))
+      return
     }
-    if (Object.keys(fe).length) {
-      setFieldErrors(fe); setError(t('auth.errors.all_fields')); return
-    }
-    setFieldErrors({})
+
     setLoading(true)
     try {
       const data = await (sub === 'register' ? register : login)(form)
       setToken(data.access_token)
       onAuth(data)
-    } catch (e) { setError(e.response?.data?.detail || t('auth.errors.auth_error')) }
+    } catch (e) {
+      setError(e.response?.data?.detail || t('auth.errors.auth_error'))
+    }
     setLoading(false)
-  }
+  }, [validateAll, sub, form, onAuth, t])
 
   return (
     <div className="auth-wrap fade-in">
@@ -121,7 +147,7 @@ export default function AuthPage({ onAuth }) {
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
-                {loading && mode === 'google' ? t('auth.loading') : t('auth.continue_google')}
+                {loading ? t('auth.loading') : t('auth.continue_google')}
               </button>
               <div
                 ref={btnRef}
@@ -129,7 +155,7 @@ export default function AuthPage({ onAuth }) {
               />
             </div>
 
-            {error && mode === 'google' && (
+            {error && (
               <div style={{ padding: '10px 14px', borderRadius: 8, marginBottom: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 13, color: '#fca5a5' }}>
                 {error}
               </div>
@@ -153,35 +179,84 @@ export default function AuthPage({ onAuth }) {
         <div className="tab-bar" style={{ marginBottom: 16 }}>
           {[['login', t('auth.tabs.login')], ['register', t('auth.tabs.register')]].map(([m, l]) => (
             <button key={m} className={`tab-btn${sub === m ? ' active' : ''}`}
-              onClick={() => { setSub(m); setError(''); setFieldErrors({}) }}>{l}</button>
+              onClick={() => switchMode(m)}>{l}</button>
           ))}
         </div>
 
         {sub === 'register' && (
           <div className="form-group">
             <div className="input-label">{t('auth.fields.name')}</div>
-            <input className="input" placeholder={t('auth.fields.name_ph')} value={form.name}
-              onChange={e => upd('name', e.target.value)} autoComplete="name"
-              style={fieldErrors.name ? { borderColor: 'var(--red)' } : {}} />
+            <input
+              className="input"
+              placeholder={t('auth.fields.name_ph')}
+              value={form.name}
+              onChange={e => upd('name', e.target.value)}
+              onBlur={() => setFieldTouched('name')}
+              autoComplete="name"
+              style={touched.name && fieldErrors.name ? { borderColor: 'var(--red)' } : {}}
+            />
+            {touched.name && fieldErrors.name && (
+              <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>{fieldErrors.name}</div>
+            )}
           </div>
         )}
 
         <div className="form-group">
           <div className="input-label">{t('auth.fields.email')}</div>
-          <input className="input" type="email" inputMode="email" placeholder="you@example.com"
-            value={form.email} onChange={e => upd('email', e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && submitEmail()} autoComplete="email"
-            style={fieldErrors.email ? { borderColor: 'var(--red)' } : {}} />
+          <input
+            className="input"
+            type="email"
+            inputMode="email"
+            placeholder="you@example.com"
+            value={form.email}
+            onChange={e => upd('email', e.target.value)}
+            onBlur={() => setFieldTouched('email')}
+            onKeyDown={e => e.key === 'Enter' && submitEmail()}
+            autoComplete="email"
+            style={touched.email && fieldErrors.email ? { borderColor: 'var(--red)' } : {}}
+          />
+          {touched.email && fieldErrors.email && (
+            <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>{fieldErrors.email}</div>
+          )}
         </div>
 
         <div className="form-group">
           <div className="input-label">{t('auth.fields.password')}</div>
-          <input className="input" type="password" placeholder={t('auth.fields.password_ph')}
-            value={form.password} onChange={e => upd('password', e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && submitEmail()}
+          <input
+            className="input"
+            type="password"
+            placeholder={t('auth.fields.password_ph')}
+            value={form.password}
+            onChange={e => upd('password', e.target.value)}
+            onBlur={() => setFieldTouched('password')}
+            onKeyDown={e => e.key === 'Enter' && sub !== 'register' && submitEmail()}
             autoComplete={sub === 'register' ? 'new-password' : 'current-password'}
-            style={fieldErrors.password ? { borderColor: 'var(--red)' } : {}} />
+            style={touched.password && fieldErrors.password ? { borderColor: 'var(--red)' } : {}}
+          />
+          {touched.password && fieldErrors.password && (
+            <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>{fieldErrors.password}</div>
+          )}
         </div>
+
+        {sub === 'register' && (
+          <div className="form-group">
+            <div className="input-label">{t('auth.fields.confirm_password') || 'Подтвердите пароль'}</div>
+            <input
+              className="input"
+              type="password"
+              placeholder={t('auth.fields.confirm_password_ph') || 'Повторите пароль'}
+              value={form.confirmPassword}
+              onChange={e => upd('confirmPassword', e.target.value)}
+              onBlur={() => setFieldTouched('confirmPassword')}
+              onKeyDown={e => e.key === 'Enter' && submitEmail()}
+              autoComplete="new-password"
+              style={touched.confirmPassword && fieldErrors.confirmPassword ? { borderColor: 'var(--red)' } : {}}
+            />
+            {touched.confirmPassword && fieldErrors.confirmPassword && (
+              <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>{fieldErrors.confirmPassword}</div>
+            )}
+          </div>
+        )}
 
         {error && (
           <div style={{ padding: '10px 14px', borderRadius: 8, marginBottom: 14, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 13, color: '#fca5a5' }}>
@@ -189,7 +264,11 @@ export default function AuthPage({ onAuth }) {
           </div>
         )}
 
-        <button className="btn-primary" onClick={submitEmail} disabled={loading}>
+        <button
+          className="btn-primary"
+          onClick={submitEmail}
+          disabled={loading || (Object.keys(touched).length > 0 && !isValid)}
+        >
           {loading ? t('auth.loading') : sub === 'register' ? t('auth.btn.create') : t('auth.btn.login')}
         </button>
       </div>

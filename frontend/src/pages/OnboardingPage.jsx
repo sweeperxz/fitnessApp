@@ -1,38 +1,91 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { upsertProfile } from '../api'
+import api from '../api'
+import { useFormValidation } from '../hooks/useFormValidation'
 
 const STEPS = 5
-
-function calcGoals({ age, weight, height, gender, activity, goal }) {
-  const w = +weight, h = +height, a = +age
-  const bmr = gender === 'male' ? 10 * w + 6.25 * h - 5 * a + 5 : 10 * w + 6.25 * h - 5 * a - 161
-  const mult = { low: 1.2, medium: 1.55, high: 1.725 }[activity] || 1.55
-  let kcal = bmr * mult
-  if (goal === 'lose') kcal -= 400
-  if (goal === 'gain') kcal += 300
-  const protein = Math.round(w * 2), fat = Math.round(w * 1)
-  const carbs = Math.max(Math.round((kcal - protein * 4 - fat * 9) / 4), 50)
-  return { calories_goal: Math.round(kcal), protein_goal: protein, fat_goal: fat, carbs_goal: carbs, water_goal: Math.round(w * 30) }
-}
 
 const MIcon = ({ d }) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
 
 export default function OnboardingPage({ onDone }) {
   const { t } = useTranslation()
   const [step, setStep] = useState(0)
-  const [data, setData] = useState({ gender: '', age: '', weight: '', height: '', goal: '', activity: '' })
   const [loading, setLoading] = useState(false)
-  const upd = (k, v) => setData(d => ({ ...d, [k]: v }))
-  const next = () => setStep(s => s + 1)
-  const back = () => setStep(s => s - 1)
+  const [previewGoals, setPreviewGoals] = useState(null)
 
-  const finish = async () => {
+  const validationRules = useMemo(() => ({
+    age: { type: 'number', params: [10, 120] },
+    height: { type: 'number', params: [100, 250] },
+    weight: { type: 'number', params: [30, 300] }
+  }), [])
+
+  const {
+    values: data,
+    errors: fieldErrors,
+    touched,
+    setValue,
+    setFieldTouched,
+    isValid
+  } = useFormValidation(
+    { gender: '', age: '', weight: '', height: '', goal: '', activity: '' },
+    validationRules
+  )
+
+  const upd = useCallback((k, v) => setValue(k, v), [setValue])
+  const next = useCallback(() => setStep(s => s + 1), [])
+  const back = useCallback(() => setStep(s => s - 1), [])
+
+  // Load preview goals when reaching final step
+  useEffect(() => {
+    if (step === 4 && data.weight && data.height && data.age && data.gender && data.goal && data.activity) {
+      const loadPreview = async () => {
+        try {
+          const { data: goals } = await api.post('/profile/calculate-goals', {
+            weight: +data.weight,
+            height: +data.height,
+            age: +data.age,
+            gender: data.gender,
+            goal: data.goal,
+            activity: data.activity
+          })
+          setPreviewGoals(goals)
+        } catch (e) {
+          console.error('Failed to load preview:', e)
+        }
+      }
+      loadPreview()
+    }
+  }, [step, data.weight, data.height, data.age, data.gender, data.goal, data.activity])
+
+  const finish = useCallback(async () => {
     setLoading(true)
-    try { await upsertProfile({ weight: +data.weight, goal: data.goal, activity: data.activity, ...calcGoals(data) }); onDone() }
-    catch (e) { console.error(e) }
+    try {
+      // Расчет целей через backend API
+      const { data: goals } = await api.post('/profile/calculate-goals', {
+        weight: +data.weight,
+        height: +data.height,
+        age: +data.age,
+        gender: data.gender,
+        goal: data.goal,
+        activity: data.activity
+      })
+
+      // Сохранение профиля с рассчитанными целями
+      await upsertProfile({
+        weight: +data.weight,
+        goal: data.goal,
+        activity: data.activity,
+        ...goals
+      })
+
+      onDone()
+    } catch (e) {
+      console.error('Onboarding failed:', e)
+      alert('Ошибка при сохранении профиля')
+    }
     setLoading(false)
-  }
+  }, [data, onDone])
 
   const GENDER_OPTS = [
     { v: 'male', label: t('onboarding.steps.gender.male'), icon: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 10c-4.42 0-8 1.79-8 4v2h16v-2c0-2.21-3.58-4-8-4z' },
@@ -81,12 +134,31 @@ export default function OnboardingPage({ onDone }) {
         <div className="ob-step">{t('onboarding.prog_step', { curr: 2, total: 5 })}</div>
         <div className="ob-title">{t('onboarding.steps.params.title')}</div>
         <div className="ob-desc">{t('onboarding.steps.params.desc')}</div>
-        {[{ k: 'age', l: t('onboarding.steps.params.age'), ph: '25', t: 'numeric' }, { k: 'height', l: t('onboarding.steps.params.height'), ph: '175', t: 'numeric' }, { k: 'weight', l: t('onboarding.steps.params.weight'), ph: '75', t: 'decimal' }].map(f => (
-          <div className="form-group" key={f.k}><div className="input-label">{f.l}</div><input className="input" type="number" inputMode={f.t} placeholder={f.ph} value={data[f.k]} onChange={e => upd(f.k, e.target.value)} /></div>
+        {[
+          { k: 'age', l: t('onboarding.steps.params.age'), ph: '25', t: 'numeric', min: 10, max: 120 },
+          { k: 'height', l: t('onboarding.steps.params.height'), ph: '175', t: 'numeric', min: 100, max: 250 },
+          { k: 'weight', l: t('onboarding.steps.params.weight'), ph: '75', t: 'decimal', min: 30, max: 300 }
+        ].map(f => (
+          <div className="form-group" key={f.k}>
+            <div className="input-label">{f.l}</div>
+            <input
+              className="input"
+              type="number"
+              inputMode={f.t}
+              placeholder={f.ph}
+              value={data[f.k]}
+              onChange={e => upd(f.k, e.target.value)}
+              onBlur={() => setFieldTouched(f.k)}
+              style={touched[f.k] && fieldErrors[f.k] ? { borderColor: 'var(--red)' } : {}}
+            />
+            {touched[f.k] && fieldErrors[f.k] && (
+              <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>{fieldErrors[f.k]}</div>
+            )}
+          </div>
         ))}
         <div className="ob-footer">
           <button className="btn-outline" onClick={back} style={{ flex: '0 0 52px' }}>{t('onboarding.footer.back')}</button>
-          <button className="btn-primary" onClick={next} disabled={!data.age || !data.height || !data.weight}>{t('onboarding.footer.next')}</button>
+          <button className="btn-primary" onClick={next} disabled={!isValid || !data.age || !data.height || !data.weight}>{t('onboarding.footer.next')}</button>
         </div>
       </>}
 
@@ -122,34 +194,31 @@ export default function OnboardingPage({ onDone }) {
         </div>
       </>}
 
-      {step === 4 && (() => {
-        const goals = data.weight && data.age && data.height ? calcGoals(data) : null
-        return <>
-          <div className="ob-step">{t('onboarding.prog_step', { curr: 5, total: 5 })}</div>
-          <div className="ob-title">{t('onboarding.steps.finish.title')}</div>
-          <div className="ob-desc">{t('onboarding.steps.finish.desc')}</div>
-          {goals && (
-            <div className="card" style={{ marginBottom: 24 }}>
-              {[
-                { l: t('today.calories'), v: goals.calories_goal + ' ' + t('onboarding.steps.finish.cal_unit'), c: 'var(--blue)' },
-                { l: t('today.protein'), v: goals.protein_goal + (t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'), c: 'var(--purple)' },
-                { l: t('today.fat'), v: goals.fat_goal + (t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'), c: 'var(--amber)' },
-                { l: t('today.carbs'), v: goals.carbs_goal + (t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'), c: 'var(--green)' },
-                { l: t('today.water'), v: goals.water_goal + ' ' + t('today.ml'), c: 'var(--text)' }
-              ].map(r => (
-                <div key={r.l} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ color: 'var(--text2)', fontSize: 14 }}>{r.l}</span>
-                  <span style={{ fontWeight: 800, fontSize: 14, color: r.c }}>{r.v}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="ob-footer">
-            <button className="btn-outline" onClick={back} style={{ flex: '0 0 52px' }}>{t('onboarding.footer.back')}</button>
-            <button className="btn-primary" onClick={finish} disabled={loading}>{loading ? t('onboarding.steps.finish.save') : t('onboarding.steps.finish.start')}</button>
+      {step === 4 && <>
+        <div className="ob-step">{t('onboarding.prog_step', { curr: 5, total: 5 })}</div>
+        <div className="ob-title">{t('onboarding.steps.finish.title')}</div>
+        <div className="ob-desc">{t('onboarding.steps.finish.desc')}</div>
+        {previewGoals && (
+          <div className="card" style={{ marginBottom: 24 }}>
+            {[
+              { l: t('today.calories'), v: previewGoals.calories_goal + ' ' + t('onboarding.steps.finish.cal_unit'), c: 'var(--blue)' },
+              { l: t('today.protein'), v: previewGoals.protein_goal + (t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'), c: 'var(--purple)' },
+              { l: t('today.fat'), v: previewGoals.fat_goal + (t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'), c: 'var(--amber)' },
+              { l: t('today.carbs'), v: previewGoals.carbs_goal + (t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'), c: 'var(--green)' },
+              { l: t('today.water'), v: previewGoals.water_goal + ' ' + t('today.ml'), c: 'var(--text)' }
+            ].map(r => (
+              <div key={r.l} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--text2)', fontSize: 14 }}>{r.l}</span>
+                <span style={{ fontWeight: 800, fontSize: 14, color: r.c }}>{r.v}</span>
+              </div>
+            ))}
           </div>
-        </>
-      })()}
+        )}
+        <div className="ob-footer">
+          <button className="btn-outline" onClick={back} style={{ flex: '0 0 52px' }}>{t('onboarding.footer.back')}</button>
+          <button className="btn-primary" onClick={finish} disabled={loading}>{loading ? t('onboarding.steps.finish.save') : t('onboarding.steps.finish.start')}</button>
+        </div>
+      </>}
     </div>
   )
 }
