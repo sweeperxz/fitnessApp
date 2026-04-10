@@ -4,6 +4,12 @@ import { errorHaptic } from '../utils/haptic'
 
 const api = axios.create({ baseURL: '/api' })
 
+// Retry configuration
+const MAX_RETRIES = 3
+const RETRY_DELAY = 1000 // 1 секунда
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+
 export const getToken = () => localStorage.getItem('ff_token')
 export const setToken = (t) => localStorage.setItem('ff_token', t)
 export const removeToken = () => localStorage.removeItem('ff_token')
@@ -11,25 +17,51 @@ export const removeToken = () => localStorage.removeItem('ff_token')
 api.interceptors.request.use(cfg => {
   const t = getToken()
   if (t) cfg.headers.Authorization = `Bearer ${t}`
+
+  // Додаємо retry config якщо його немає
+  if (!cfg.retryCount) cfg.retryCount = 0
+
   return cfg
 })
 
 api.interceptors.response.use(
   r => r,
-  err => {
+  async err => {
+    const config = err.config
+
     // Auth error — logout
-    if (err.response?.status === 401) { removeToken(); window.location.reload() }
+    if (err.response?.status === 401) {
+      removeToken()
+      window.location.reload()
+      return Promise.reject(err)
+    }
+
+    // Retry logic для network errors та 5xx помилок
+    const shouldRetry = (
+      !err.response || // Network error
+      (err.response.status >= 500 && err.response.status < 600) // Server error
+    ) && config && config.retryCount < MAX_RETRIES
+
+    if (shouldRetry) {
+      config.retryCount += 1
+      console.log(`Retry attempt ${config.retryCount}/${MAX_RETRIES} for ${config.url}`)
+
+      // Exponential backoff
+      await sleep(RETRY_DELAY * config.retryCount)
+
+      return api(config)
+    }
 
     // Network error on write request → save to offline queue
-    if (!err.response && err.config) {
-      const method = err.config.method
+    if (!err.response && config) {
+      const method = config.method
       if (method === 'post' || method === 'delete') {
         errorHaptic()
-        enqueue(method, err.config.url, err.config.data ? JSON.parse(err.config.data) : null)
+        enqueue(method, config.url, config.data ? JSON.parse(config.data) : null)
         // Return a fake success so the UI doesn't show an error
         return Promise.resolve({ data: { _offline: true } })
       }
-      
+
       // For GET requests or others without a response
       err.isOffline = true
     }

@@ -42,6 +42,11 @@ class Settings(BaseSettings):
         """Преобразует строку CORS_ORIGINS в список"""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
+    def model_post_init(self, __context):
+        """Валідація після ініціалізації"""
+        if self.VAPID_EMAIL and not (self.VAPID_EMAIL.startswith("mailto:") or self.VAPID_EMAIL.startswith("https://")):
+            raise ValueError(f"VAPID_EMAIL повинен починатися з 'mailto:' або 'https://', отримано: {self.VAPID_EMAIL}")
+
 
 # Singleton instance
 settings = Settings()

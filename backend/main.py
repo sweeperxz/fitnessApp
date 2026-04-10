@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from typing import Optional
+import logging
 
 import httpx
 from fastapi import FastAPI, Depends, HTTPException, Request
@@ -13,9 +14,21 @@ from slowapi.errors import RateLimitExceeded
 
 import models, schemas, crud
 from database import SessionLocal, engine
-from auth import get_db, get_current_user, get_admin_user, hash_password, verify_password, create_token
+from auth import get_db, get_current_user, get_admin_user, hash_password, verify_password, create_token, validate_password_strength
 from config import settings
 from routers import profile
+from csrf import generate_csrf_token, verify_csrf_token, require_csrf
+
+# Налаштування логування
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('nutrio.log')
+    ]
+)
+logger = logging.getLogger(__name__)
 
 try:
     from pywebpush import webpush, WebPushException
@@ -24,6 +37,9 @@ except ImportError:
     WebPushException = Exception
 
 models.Base.metadata.create_all(bind=engine)
+
+logger.info("Nutrio API starting up...")
+logger.info(f"CORS origins: {settings.cors_origins_list}")
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -44,15 +60,23 @@ app.include_router(profile.router)
 
 # ── Health ────────────────────────────────────────────────
 @app.get("/health")
-def health(): return {"status": "ok"}
+def health(db: Session = Depends(get_db)):
+    try:
+        # Перевіряємо з'єднання з БД
+        db.execute("SELECT 1")
+        return {"status": "ok", "database": "connected"}
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        raise HTTPException(503, detail={"status": "error", "database": "disconnected", "error": str(e)})
 
 # ── Auth: email/password ──────────────────────────────────
 @app.post("/auth/register", response_model=schemas.TokenResponse)
 def register(data: schemas.RegisterRequest, db: Session = Depends(get_db)):
     if db.query(models.User).filter(models.User.email == data.email.lower()).first():
         raise HTTPException(400, "Email уже зарегистрирован")
-    if len(data.password) < 6:
-        raise HTTPException(400, "Пароль минимум 6 символов")
+    is_valid, error_msg = validate_password_strength(data.password)
+    if not is_valid:
+        raise HTTPException(400, error_msg)
     user = models.User(email=data.email.lower(), password_hash=hash_password(data.password), name=data.name)
     db.add(user); db.commit(); db.refresh(user)
     return schemas.TokenResponse(access_token=create_token(user.id), user_id=user.id, name=user.name, email=user.email, role=user.role, has_profile=False)
@@ -74,42 +98,76 @@ def google_auth(data: schemas.GoogleAuthRequest, db: Session = Depends(get_db)):
         if not settings.GOOGLE_CLIENT_ID:
             raise HTTPException(500, "Google OAuth не настроен: задайте GOOGLE_CLIENT_ID")
         info = id_token.verify_oauth2_token(data.credential, g_requests.Request(), settings.GOOGLE_CLIENT_ID)
-        
+
         email = info.get("email", "").lower()
         name  = info.get("name", "")
         google_id = info.get("sub", "")
-        
-        if not email:
-            raise HTTPException(400, "Email не получен от Google")
-        
-        user = db.query(models.User).filter(models.User.email == email).first()
+
+        if not email or not google_id:
+            raise HTTPException(400, "Email або Google ID не отримано від Google")
+
+        # Спочатку шукаємо за google_id (найбезпечніше)
+        user = db.query(models.User).filter(models.User.google_id == google_id).first()
+
         if not user:
-            # Создаём нового пользователя — пароль не нужен (google_id как hash)
-            user = models.User(email=email, password_hash=f"google:{google_id}", name=name)
+            # Перевіряємо чи існує користувач з таким email
+            existing_user = db.query(models.User).filter(models.User.email == email).first()
+            if existing_user and existing_user.password_hash:
+                # Користувач з email/password вже існує - не дозволяємо прив'язку
+                raise HTTPException(400, "Користувач з таким email вже зареєстрований через пароль")
+
+            # Створюємо нового користувача
+            user = models.User(email=email, google_id=google_id, name=name, password_hash=None)
             db.add(user); db.commit(); db.refresh(user)
-        elif user.password_hash.startswith("google:"):
-            # Обновляем имя если изменилось
+        else:
+            # Оновляємо ім'я якщо змінилося
             if name and user.name != name:
-                user.name = name; db.commit()
-        
+                user.name = name
+                db.commit()
+
         profile = crud.get_profile(db, user.id)
         return schemas.TokenResponse(access_token=create_token(user.id), user_id=user.id, name=user.name, email=user.email, role=user.role, has_profile=bool(profile and profile.goal))
-    
+
     except ValueError as e:
         raise HTTPException(401, f"Невалидный Google токен: {str(e)}")
 
 @app.get("/auth/me", response_model=schemas.TokenResponse)
 def me(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     profile = crud.get_profile(db, user.id)
-    return schemas.TokenResponse(access_token="", user_id=user.id, name=user.name, email=user.email, role=user.role, has_profile=bool(profile and profile.goal))
+    csrf_token = generate_csrf_token(user.id)
+    return schemas.TokenResponse(
+        access_token=csrf_token,  # Повертаємо CSRF токен замість порожнього рядка
+        user_id=user.id,
+        name=user.name,
+        email=user.email,
+        role=user.role,
+        has_profile=bool(profile and profile.goal)
+    )
 
 # ── Admin ──────────────────────────────────────────────────
 @app.get("/admin/users", response_model=list[schemas.UserAdminResponse])
-def get_all_users(admin: models.User = Depends(get_admin_user), db: Session = Depends(get_db)):
-    return db.query(models.User).order_by(models.User.id.desc()).all()
+def get_all_users(
+    admin: models.User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 50
+):
+    # Обмежуємо максимальний limit
+    limit = min(limit, 100)
+    users = db.query(models.User).order_by(models.User.id.desc()).offset(skip).limit(limit).all()
+    return users
 
 @app.put("/admin/users/{user_id}/role", response_model=schemas.UserAdminResponse)
-def update_role(user_id: int, data: schemas.UserRoleUpdate, admin: models.User = Depends(get_admin_user), db: Session = Depends(get_db)):
+def update_role(
+    user_id: int,
+    data: schemas.UserRoleUpdate,
+    admin: models.User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+    csrf_token: str = Depends(require_csrf)
+):
+    # Перевірка CSRF токена
+    if not verify_csrf_token(csrf_token, admin.id):
+        raise HTTPException(403, "Невалідний CSRF токен")
     # Защита от снятия админки самому себе
     if user_id == admin.id and data.role != 'admin':
         raise HTTPException(400, "Нельзя снять роль администратора самому себе")
@@ -119,7 +177,15 @@ def update_role(user_id: int, data: schemas.UserRoleUpdate, admin: models.User =
     return user
 
 @app.delete("/admin/users/{user_id}")
-def delete_user(user_id: int, admin: models.User = Depends(get_admin_user), db: Session = Depends(get_db)):
+def delete_user(
+    user_id: int,
+    admin: models.User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+    csrf_token: str = Depends(require_csrf)
+):
+    # Перевірка CSRF токена
+    if not verify_csrf_token(csrf_token, admin.id):
+        raise HTTPException(403, "Невалідний CSRF токен")
     if user_id == admin.id:
         raise HTTPException(400, "Нельзя удалить самого себя")
     success = crud.delete_user(db, user_id)
@@ -141,21 +207,34 @@ def upsert_profile(data: schemas.ProfileCreate, user: models.User = Depends(get_
 # ── Nutrition ─────────────────────────────────────────────
 @app.get("/nutrition/{day}", response_model=schemas.NutritionDay)
 def get_nutrition(day: date, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Валідація дати: не більше 1 року назад і не в майбутньому
+    today = date.today()
+    one_year_ago = today.replace(year=today.year - 1)
+
+    if day > today:
+        raise HTTPException(400, "Неможливо отримати дані для майбутньої дати")
+    if day < one_year_ago:
+        raise HTTPException(400, "Дані доступні тільки за останній рік")
+
     return crud.get_nutrition_day(db, user.id, day)
 
 @app.post("/nutrition/meal", response_model=schemas.Meal)
 def add_meal(data: schemas.MealCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     today = date.today()
-    calories_before = crud.get_daily_calories(db, user.id, today)
-    profile = crud.get_profile(db, user.id)
-    
+
+    # Перевіряємо чи ціль була досягнута ДО додавання
+    was_reached_before, _, _ = crud.check_goal_reached(db, user.id, today, 'calories')
+
+    # Додаємо прийом їжі
     meal = crud.add_meal(db, user.id, data)
-    
-    if profile and profile.calories_goal:
-        calories_after = calories_before + meal.calories
-        if calories_before < profile.calories_goal and calories_after >= profile.calories_goal:
-            send_push_notification(db, user.id, "🎯 Отлично! Дневная цель по калориям достигнута!")
-            
+
+    # Перевіряємо чи ціль досягнута ПІСЛЯ додавання
+    was_reached_after, _, _ = crud.check_goal_reached(db, user.id, today, 'calories')
+
+    # Надсилаємо нотифікацію тільки якщо ціль щойно досягнута
+    if not was_reached_before and was_reached_after:
+        send_push_notification(db, user.id, "🎯 Отлично! Дневная цель по калориям достигнута!")
+
     return meal
 
 @app.delete("/nutrition/meal/{meal_id}")
@@ -165,16 +244,20 @@ def delete_meal(meal_id: int, user: models.User = Depends(get_current_user), db:
 @app.post("/nutrition/water", response_model=schemas.WaterLog)
 def log_water(data: schemas.WaterLogCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     today = date.today()
-    water_before = crud.get_daily_water(db, user.id, today)
-    profile = crud.get_profile(db, user.id)
-    
+
+    # Перевіряємо чи ціль була досягнута ДО додавання
+    was_reached_before, _, _ = crud.check_goal_reached(db, user.id, today, 'water')
+
+    # Додаємо запис води
     water = crud.log_water(db, user.id, data)
-    
-    if profile and profile.water_goal:
-        water_after = water_before + water.amount_ml
-        if water_before < profile.water_goal and water_after >= profile.water_goal:
-            send_push_notification(db, user.id, "💧 Супер! Вы выпили дневную норму воды!")
-            
+
+    # Перевіряємо чи ціль досягнута ПІСЛЯ додавання
+    was_reached_after, _, _ = crud.check_goal_reached(db, user.id, today, 'water')
+
+    # Надсилаємо нотифікацію тільки якщо ціль щойно досягнута
+    if not was_reached_before and was_reached_after:
+        send_push_notification(db, user.id, "💧 Супер! Вы выпили дневную норму воды!")
+
     return water
 
 # ── Workouts ──────────────────────────────────────────────
@@ -246,18 +329,23 @@ async def ai_chat(data: schemas.ChatRequest, user: models.User = Depends(get_cur
             res.raise_for_status()
             return res.json() # Возвращаем сырой ответ Gemini на фронтенд
         except httpx.HTTPStatusError as e:
-            # Выводим ошибку в консоль сервера для дебага
-            print(f"Gemini API Error: {e.response.text}")
+            logger.error(f"Gemini API Error: {e.response.status_code} - {e.response.text}")
             raise HTTPException(status_code=e.response.status_code, detail="Ошибка от провайдера AI")
         except Exception as e:
+            logger.error(f"Internal AI chat error: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при обращении к AI")
 
 
 @app.get("/foods/recent", response_model=list[schemas.FoodItemResponse])
-def get_recent_foods(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Берем топ-20 последних продуктов юзера
+def get_recent_foods(
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    limit: int = 20
+):
+    # Обмежуємо максимальний limit
+    limit = min(limit, 50)
     foods = db.query(models.UserFood).filter(models.UserFood.user_id == user.id) \
-        .order_by(models.UserFood.last_used.desc()).limit(20).all()
+        .order_by(models.UserFood.last_used.desc()).limit(limit).all()
     return foods
 
 
@@ -301,8 +389,13 @@ def send_push_notification(db: Session, user_id: int, message: str):
                 subscription_info={"endpoint": s.endpoint, "keys": {"p256dh": s.p256dh, "auth": s.auth}},
                 data=message,
                 vapid_private_key=settings.VAPID_PRIVATE_KEY,
-                vapid_claims={"sub": settings.VAPID_EMAIL if settings.VAPID_EMAIL.startswith(("mailto:", "https://")) else f"mailto:{settings.VAPID_EMAIL}"}
+                vapid_claims={"sub": settings.VAPID_EMAIL}
             )
+        except WebPushException as e:
+            # Якщо підписка застаріла (410 Gone), видаляємо її
+            if e.response and e.response.status_code == 410:
+                db.delete(s)
+                db.commit()
         except Exception:
             pass
 
@@ -342,10 +435,16 @@ def test_push(user: models.User = Depends(get_current_user), db: Session = Depen
                 },
                 data="Привет от Nutrio! Уведомления работают 🎉",
                 vapid_private_key=settings.VAPID_PRIVATE_KEY,
-                vapid_claims={"sub": settings.VAPID_EMAIL if settings.VAPID_EMAIL.startswith(("mailto:", "https://")) else f"mailto:{settings.VAPID_EMAIL}"}
+                vapid_claims={"sub": settings.VAPID_EMAIL}
             )
             results.append({"endpoint": s.endpoint, "status": "sent"})
         except WebPushException as ex:
-            results.append({"endpoint": s.endpoint, "status": "failed", "error": str(ex)})
+            # Якщо підписка застаріла (410 Gone), видаляємо її
+            if ex.response and ex.response.status_code == 410:
+                db.delete(s)
+                db.commit()
+                results.append({"endpoint": s.endpoint, "status": "removed", "reason": "subscription expired (410)"})
+            else:
+                results.append({"endpoint": s.endpoint, "status": "failed", "error": str(ex)})
 
     return {"ok": True, "results": results}

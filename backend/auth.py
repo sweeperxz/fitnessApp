@@ -24,6 +24,18 @@ def hash_password(password: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
+def validate_password_strength(password: str) -> tuple[bool, str]:
+    """Перевіряє складність пароля. Повертає (is_valid, error_message)"""
+    if len(password) < 8:
+        return False, "Пароль повинен містити мінімум 8 символів"
+    if not any(c.isupper() for c in password):
+        return False, "Пароль повинен містити хоча б одну велику літеру"
+    if not any(c.islower() for c in password):
+        return False, "Пароль повинен містити хоча б одну малу літеру"
+    if not any(c.isdigit() for c in password):
+        return False, "Пароль повинен містити хоча б одну цифру"
+    return True, ""
+
 def create_token(user_id: int) -> str:
     expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return jwt.encode({"sub": str(user_id), "exp": expire}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)

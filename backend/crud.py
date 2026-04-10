@@ -1,13 +1,23 @@
 from sqlalchemy.orm import Session
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 import models, schemas
+from cache import get_cached_profile, set_cached_profile, invalidate_profile_cache
 
 # ── Profile ───────────────────────────────────────────────
 def get_profile(db: Session, user_id: int):
-    return db.query(models.Profile).filter(models.Profile.user_id == user_id).first()
+    # Спочатку перевіряємо кеш
+    cached = get_cached_profile(user_id)
+    if cached:
+        return cached
+
+    # Якщо немає в кеші, запитуємо з БД
+    profile = db.query(models.Profile).filter(models.Profile.user_id == user_id).first()
+    if profile:
+        set_cached_profile(user_id, profile)
+    return profile
 
 def upsert_profile(db: Session, user_id: int, data: schemas.ProfileCreate):
-    p = get_profile(db, user_id)
+    p = db.query(models.Profile).filter(models.Profile.user_id == user_id).first()
     if p:
         for k, v in data.model_dump().items():
             setattr(p, k, v)
@@ -16,6 +26,11 @@ def upsert_profile(db: Session, user_id: int, data: schemas.ProfileCreate):
         db.add(p)
     db.commit()
     db.refresh(p)
+
+    # Інвалідуємо кеш після оновлення
+    invalidate_profile_cache(user_id)
+    set_cached_profile(user_id, p)
+
     return p
 
 # ── Nutrition ─────────────────────────────────────────────
@@ -80,7 +95,8 @@ def log_water(db: Session, user_id: int, data: schemas.WaterLogCreate):
 
 # ── Workouts ──────────────────────────────────────────────
 def get_workouts(db: Session, user_id: int, from_date=None, to_date=None):
-    q = db.query(models.Workout).filter(models.Workout.user_id == user_id)
+    from sqlalchemy.orm import joinedload
+    q = db.query(models.Workout).options(joinedload(models.Workout.exercises)).filter(models.Workout.user_id == user_id)
     if from_date: q = q.filter(models.Workout.day >= from_date)
     if to_date:   q = q.filter(models.Workout.day <= to_date)
     return q.order_by(models.Workout.day.desc()).all()
@@ -220,7 +236,51 @@ def subscribe_push(db: Session, user_id: int, data: schemas.PushSubscriptionCrea
     db.refresh(sub)
     return sub
 
+def get_push_subscriptions(db: Session, user_id: int):
     return db.query(models.PushSubscription).filter(models.PushSubscription.user_id == user_id).all()
+
+def check_goal_reached(db: Session, user_id: int, day: date, goal_type: str) -> tuple[bool, float, float]:
+    """
+    Перевіряє чи досягнута ціль. Повертає (was_reached_before, value_before, value_after).
+    goal_type: 'calories' або 'water'
+    """
+    from sqlalchemy import func as sqfunc
+
+    profile = get_profile(db, user_id)
+    if not profile:
+        return False, 0, 0
+
+    if goal_type == 'calories':
+        goal = profile.calories_goal
+        if not goal:
+            return False, 0, 0
+
+        # Отримуємо поточну суму калорій
+        result = db.query(sqfunc.sum(models.Meal.calories)).filter(
+            models.Meal.user_id == user_id,
+            models.Meal.day == day
+        ).scalar()
+
+        total = float(result) if result else 0.0
+        was_reached = total >= goal
+        return was_reached, total, total
+
+    elif goal_type == 'water':
+        goal = profile.water_goal
+        if not goal:
+            return False, 0, 0
+
+        # Отримуємо поточну суму води
+        result = db.query(sqfunc.sum(models.WaterLog.amount_ml)).filter(
+            models.WaterLog.user_id == user_id,
+            models.WaterLog.day == day
+        ).scalar()
+
+        total = int(result) if result else 0
+        was_reached = total >= goal
+        return was_reached, total, total
+
+    return False, 0, 0
 
 # ── Admin ──────────────────────────────────────────────────
 def update_user_role(db: Session, user_id: int, role: str):

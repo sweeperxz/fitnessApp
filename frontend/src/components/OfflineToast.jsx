@@ -5,7 +5,7 @@ import { onQueueChange } from '../utils/offlineQueue'
 /**
  * OfflineToast — shows status messages for offline queue
  */
-export default function OfflineToast() {
+const OfflineToast = React.memo(function OfflineToast() {
     const { t } = useTranslation()
     const [toast, setToast] = useState(null) // { text, type: 'offline'|'synced' }
     const timerRef = useRef(null)
@@ -89,4 +89,6 @@ export default function OfflineToast() {
       `}</style>
         </div>
     )
-}
+})
+
+export default OfflineToast

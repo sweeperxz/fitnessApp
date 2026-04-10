@@ -7,9 +7,12 @@ const validators = {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     return regex.test(value) ? null : 'Неверный формат email'
   },
-  password: (value, minLength = 6) => {
+  password: (value, minLength = 8) => {
     if (!value) return 'Обязательное поле'
     if (value.length < minLength) return `Минимум ${minLength} символов`
+    if (!/[A-Z]/.test(value)) return 'Должна быть хотя бы одна заглавная буква'
+    if (!/[a-z]/.test(value)) return 'Должна быть хотя бы одна строчная буква'
+    if (!/[0-9]/.test(value)) return 'Должна быть хотя бы одна цифра'
     return null
   },
   confirmPassword: (value, password) => {
@@ -26,8 +29,32 @@ const validators = {
     if (!value) return 'Обязательное поле'
     const num = Number(value)
     if (isNaN(num)) return 'Должно быть числом'
+    if (num < 0) return 'Не может быть отрицательным'
     if (min !== undefined && num < min) return `Минимум ${min}`
     if (max !== undefined && num > max) return `Максимум ${max}`
+    return null
+  },
+  positiveNumber: (value) => {
+    if (!value) return 'Обязательное поле'
+    const num = Number(value)
+    if (isNaN(num)) return 'Должно быть числом'
+    if (num <= 0) return 'Должно быть больше нуля'
+    return null
+  },
+  calories: (value) => {
+    if (!value) return 'Обязательное поле'
+    const num = Number(value)
+    if (isNaN(num)) return 'Должно быть числом'
+    if (num < 0) return 'Не может быть отрицательным'
+    if (num > 10000) return 'Слишком большое значение'
+    return null
+  },
+  macros: (value) => {
+    if (!value) return 'Обязательное поле'
+    const num = Number(value)
+    if (isNaN(num)) return 'Должно быть числом'
+    if (num < 0) return 'Не может быть отрицательным'
+    if (num > 1000) return 'Слишком большое значение'
     return null
   }
 }

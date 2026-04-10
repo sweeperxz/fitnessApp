@@ -18,7 +18,7 @@ const AIPage = React.lazy(() => import('./pages/AIPage'))
 const AdminPage = React.lazy(() => import('./pages/AdminPage'))
 
 // ─── Lightweight suspense fallback ──────────────────────
-function PageSkeleton() {
+const PageSkeleton = React.memo(function PageSkeleton() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 16px', marginTop: 12 }}>
       <div className="skeleton skeleton-header" />
@@ -26,7 +26,7 @@ function PageSkeleton() {
       <div className="skeleton skeleton-card" />
     </div>
   )
-}
+})
 
 // ─── Error boundary for offline lazy-load failures ───────
 class ChunkErrorBoundary extends React.Component {
@@ -103,7 +103,7 @@ class ChunkErrorBoundary extends React.Component {
 const TranslatedChunkErrorBoundary = withTranslation()(ChunkErrorBoundary)
 
 // ─── Update Banner (flex item, NOT fixed) ───────────────
-function UpdateBanner() {
+const UpdateBanner = React.memo(function UpdateBanner() {
   const { t } = useTranslation()
   const [show, setShow] = useState(false)
   const [worker, setWorker] = useState(null)
@@ -137,7 +137,7 @@ function UpdateBanner() {
       </button>
     </div>
   )
-}
+})
 
 // ─── Nav icons ──────────────────────────────────────────
 const NAV = [

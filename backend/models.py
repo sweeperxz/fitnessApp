@@ -1,15 +1,21 @@
 from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, Index, func
 from sqlalchemy.orm import relationship
 from database import Base
+from datetime import datetime, timezone
+
+def utcnow():
+    """Повертає поточний час в UTC"""
+    return datetime.now(timezone.utc)
 
 class User(Base):
     __tablename__ = "users"
     id            = Column(Integer, primary_key=True, index=True)
     email         = Column(String, unique=True, index=True, nullable=False)
-    password_hash = Column(String, nullable=False)
+    password_hash = Column(String, nullable=True)  # Nullable для OAuth користувачів
     name          = Column(String, default="")
     role          = Column(String, default="user", nullable=False)
-    created_at    = Column(DateTime, default=func.now())
+    google_id     = Column(String, unique=True, nullable=True, index=True)  # Окреме поле для Google ID
+    created_at    = Column(DateTime, default=utcnow)
 
     profile  = relationship("Profile", back_populates="user", uselist=False, cascade="all, delete")
     meals    = relationship("Meal",    back_populates="user", cascade="all, delete")
@@ -46,7 +52,7 @@ class Meal(Base):
     protein    = Column(Float, default=0)
     fat        = Column(Float, default=0)
     carbs      = Column(Float, default=0)
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=utcnow)
 
     user = relationship("User", back_populates="meals")
 
@@ -59,7 +65,7 @@ class WaterLog(Base):
     user_id    = Column(Integer, ForeignKey("users.id"), index=True)
     day        = Column(Date, nullable=False)
     amount_ml  = Column(Integer, nullable=False)
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=utcnow)
 
     user = relationship("User", back_populates="waters")
 
@@ -73,7 +79,7 @@ class Workout(Base):
     day        = Column(Date, nullable=False)
     title      = Column(String, default="Тренировка")
     notes      = Column(String, default="")
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=utcnow)
 
     user      = relationship("User", back_populates="workouts")
     exercises = relationship("Exercise", back_populates="workout", cascade="all, delete")
@@ -101,7 +107,7 @@ class UserFood(Base):
     protein = Column(Integer)
     fat = Column(Integer)
     carbs = Column(Integer)
-    last_used = Column(DateTime, default=func.now())
+    last_used = Column(DateTime, default=utcnow)
 
     user = relationship("User", back_populates="foods")
 
@@ -112,6 +118,6 @@ class PushSubscription(Base):
     endpoint   = Column(String, unique=True, nullable=False)
     p256dh     = Column(String, nullable=False)
     auth       = Column(String, nullable=False)
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=utcnow)
 
     user = relationship("User")
