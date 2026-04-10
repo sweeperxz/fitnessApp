@@ -1,216 +1,57 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import ReactDOM from 'react-dom'
 import dayjs from 'dayjs'
 import 'dayjs/locale/en'
 import 'dayjs/locale/uk'
-import {
-  getNutritionDay, addMeal, deleteMeal,
-  logWater, getProfile, sendChatMessage,
-} from '../api'
-import { tapHaptic, mediumHaptic, successHaptic } from '../utils/haptic'
-import { MEAL_TYPES, MealIcons } from '../utils/constants'
-import Ring from '../components/Ring'
-import AddModal from '../components/AddMeal/AddModal'
-import {
-  saveOfflineData,
-  getOfflineData,
-  markAsSynced,
-  addPendingSync,
-  getPendingSync,
-  removePendingSync
-} from '../utils/offlineStorage'
+import { addMeal, deleteMeal, logWater } from '../api'
+import { tapHaptic, successHaptic } from '../utils/haptic'
+import { MEAL_TYPES } from '../utils/constants'
+import './today/TodayPage.css'
+import TodayHeader from './today/components/TodayHeader'
+import StatusBanner from './today/components/StatusBanner'
+import NutritionCard from './today/components/NutritionCard'
+import WaterCard from './today/components/WaterCard'
+import AiTipsCard from './today/components/AiTipsCard'
+import MealsCard from './today/components/MealsCard'
+import TodayFabPortal from './today/components/TodayFabPortal'
+import { useTodayData } from './today/hooks/useTodayData'
+import { useTodaySync } from './today/hooks/useTodaySync'
+import { useAiTips } from './today/hooks/useAiTips'
 
-// Глобальный кэш для ИИ-советов, чтобы они не пропадали при переходе на другие вкладки
-const globalAiTipsCache = {}
-
-// ─── Main Page ────────────────────────────────────────────
 export default function TodayPage() {
   const { t, i18n } = useTranslation()
   const [day, setDay] = useState(dayjs())
-  const [data, setData] = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [modal, setModal] = useState(false)
-  const [isOffline, setIsOffline] = useState(!navigator.onLine)
+  const [modalOpen, setModalOpen] = useState(false)
 
-  // Set dayjs locale based on i18n language
   useEffect(() => {
     dayjs.locale(i18n.language === 'en' ? 'en' : 'uk')
   }, [i18n.language])
 
-  // Инициализируем стейт из кэша для текущего дня (по умолчанию сегодня)
-  const initDateStr = dayjs().format('YYYY-MM-DD')
-  const [tipsOpen, setTipsOpen] = useState(() => globalAiTipsCache[initDateStr]?.open || false)
-  const [aiTips, setAiTips] = useState(() => globalAiTipsCache[initDateStr]?.tips || null)
-  const [tipsLoading, setTipsLoading] = useState(false)
-  const [syncing, setSyncing] = useState(false)
-  const [hasUnsyncedData, setHasUnsyncedData] = useState(false)
-  const [showSyncSuccess, setShowSyncSuccess] = useState(false)
+  const {
+    data,
+    profile,
+    isOffline,
+    setIsOffline,
+    setData,
+    load,
+    fallbackProfile,
+    emptyNutrition,
+  } = useTodayData(day)
 
-  // Проверка несинхронизированных данных
-  useEffect(() => {
-    const checkUnsynced = () => {
-      const pending = getPendingSync()
-      setHasUnsyncedData(pending.length > 0)
-    }
-    checkUnsynced()
-    const interval = setInterval(checkUnsynced, 5000)
-    return () => clearInterval(interval)
-  }, [])
+  const {
+    syncing,
+    hasUnsyncedData,
+    showSyncSuccess,
+    queueWaterOffline,
+    queueAddMealOffline,
+  } = useTodaySync({ day, load, setData, setIsOffline })
 
-  const fb = { calories_goal: 2000, protein_goal: 150, fat_goal: 70, carbs_goal: 250, water_goal: 2500 }
-
-  const load = useCallback(async () => {
-    try {
-      const [nd, pr] = await Promise.all([
-        getNutritionDay(day.format('YYYY-MM-DD')),
-        getProfile().catch(() => fb),
-      ])
-      setData(nd)
-      setProfile(pr)
-      setIsOffline(false)
-
-      // Сохраняем в локальное хранилище
-      saveOfflineData(`nutrition_${day.format('YYYY-MM-DD')}`, nd)
-      saveOfflineData('profile', pr)
-      markAsSynced(`nutrition_${day.format('YYYY-MM-DD')}`)
-      markAsSynced('profile')
-    } catch (err) {
-      if (err.isOffline || !navigator.onLine) {
-        setIsOffline(true)
-
-        // Загружаем из локального хранилища
-        const cachedNutrition = getOfflineData(`nutrition_${day.format('YYYY-MM-DD')}`)
-        const cachedProfile = getOfflineData('profile')
-
-        if (cachedNutrition) {
-          setData(cachedNutrition.data)
-        } else {
-          setData({ meals: [], total_calories: 0, total_protein: 0, total_fat: 0, total_carbs: 0, water_ml: 0 })
-        }
-
-        if (cachedProfile) {
-          setProfile(cachedProfile.data)
-        } else {
-          setProfile(fb)
-        }
-      } else {
-        setData({ meals: [], total_calories: 0, total_protein: 0, total_fat: 0, total_carbs: 0, water_ml: 0 })
-        setProfile(fb)
-      }
-    }
-  }, [day])
-
-  const addWaterWithValidation = useCallback(async (ml) => {
-    const MAX_DAILY_WATER = 10000 // 10 литров - максимум в день
-    const MAX_SINGLE_INTAKE = 2000 // 2 литра - максимум за раз
-
-    // Проверка разовой порции
-    if (ml > MAX_SINGLE_INTAKE) {
-      alert(t('today.water_warning_single') || `⚠️ Warning: Drinking more than ${MAX_SINGLE_INTAKE}ml at once can be dangerous. Please add smaller portions.`)
-      return
-    }
-
-    // Проверка дневного лимита
-    const newTotal = (data?.water_ml || 0) + ml
-    if (newTotal > MAX_DAILY_WATER) {
-      alert(t('today.water_warning_daily') || `⚠️ Warning: Total water intake would exceed ${MAX_DAILY_WATER}ml (${MAX_DAILY_WATER/1000}L) per day, which can be dangerous. Current: ${data?.water_ml || 0}ml`)
-      return
-    }
-
-    tapHaptic()
-
-    if (isOffline) {
-      // Оффлайн режим: сохраняем локально
-      addPendingSync({
-        type: 'logWater',
-        data: { day: day.format('YYYY-MM-DD'), amount_ml: ml }
-      })
-
-      // Обновляем UI локально
-      setData(prev => ({
-        ...prev,
-        water_ml: prev.water_ml + ml
-      }))
-
-      setHasUnsyncedData(true)
-      successHaptic()
-    } else {
-      // Онлайн режим: отправляем на сервер
-      await logWater({ day: day.format('YYYY-MM-DD'), amount_ml: ml })
-      successHaptic()
-      load()
-    }
-  }, [data, day, load, t, isOffline])
-
-  useEffect(() => { load() }, [load])
-
-  useEffect(() => {
-    const handleOnline = async () => {
-      setIsOffline(false)
-
-      // Автоматическая синхронизация при восстановлении соединения
-      setSyncing(true)
-      try {
-        const pending = getPendingSync()
-
-        for (const operation of pending) {
-          try {
-            if (operation.type === 'addMeal') {
-              await addMeal(operation.data)
-            } else if (operation.type === 'deleteMeal') {
-              await deleteMeal(operation.data.id)
-            } else if (operation.type === 'logWater') {
-              await logWater(operation.data)
-            }
-            removePendingSync(operation.id)
-          } catch (e) {
-            console.error('Failed to sync operation:', e)
-          }
-        }
-
-        // Перезагружаем данные после синхронизации
-        await load()
-        setHasUnsyncedData(false)
-
-        // Показываем уведомление об успешной синхронизации
-        if (pending.length > 0) {
-          successHaptic()
-          setShowSyncSuccess(true)
-
-          // Автоматически скрываем через 3 секунды
-          setTimeout(() => {
-            setShowSyncSuccess(false)
-          }, 3000)
-        }
-      } catch (e) {
-        console.error('Sync failed:', e)
-      }
-      setSyncing(false)
-    }
-
-    const handleOffline = () => setIsOffline(true)
-
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [load])
-
-  // Обновляем ИИ-советы ИЗ КЭША при смене дня (а не просто обнуляем)
-  useEffect(() => {
-    const dStr = day.format('YYYY-MM-DD')
-    setAiTips(globalAiTipsCache[dStr]?.tips || null)
-    setTipsOpen(globalAiTipsCache[dStr]?.open || false)
-  }, [day])
-
-  const pr = profile || fb
-  const d = data || { meals: [], total_calories: 0, total_protein: 0, total_fat: 0, total_carbs: 0, water_ml: 0 }
+  const pr = profile || fallbackProfile
+  const d = data || emptyNutrition
 
   const remaining = Math.max(pr.calories_goal - d.total_calories, 0)
   const waterPct = Math.min((d.water_ml / pr.water_goal) * 100, 100)
+
   const isToday = day.isSame(dayjs(), 'day')
   const dayLabel = isToday
     ? t('common.today')
@@ -218,377 +59,141 @@ export default function TodayPage() {
       ? t('common.yesterday')
       : day.locale(i18n.language).format('D MMMM')
 
-  const groups = useMemo(() =>
-    MEAL_TYPES
-      .map(t => ({ type: t, items: d.meals.filter(m => m.meal_type === t) }))
-      .filter(g => g.items.length > 0),
-    [d.meals]
-  )
-
   const macros = useMemo(() => [
     { l: t('today.protein'), v: d.total_protein, g: pr.protein_goal, c: 'var(--purple)' },
     { l: t('today.fat'), v: d.total_fat, g: pr.fat_goal, c: 'var(--amber)' },
     { l: t('today.carbs'), v: d.total_carbs, g: pr.carbs_goal, c: 'var(--blue)' },
   ], [d.total_protein, d.total_fat, d.total_carbs, pr.protein_goal, pr.fat_goal, pr.carbs_goal, t])
 
-  const loadAiTips = async () => {
-    if (aiTips || tipsLoading) return
-    setTipsLoading(true)
-    try {
-      const prompt = `Ты строгий, но полезный ИИ-нутрициолог. 
-      Вот статистика пользователя за день (${dayLabel}):
-      Калории: съедено ${Math.round(d.total_calories)} из ${pr.calories_goal} ккал.
-      Белки: ${Math.round(d.total_protein)} из ${pr.protein_goal} г.
-      Жиры: ${Math.round(d.total_fat)} из ${pr.fat_goal} г.
-      Углеводы: ${Math.round(d.total_carbs)} из ${pr.carbs_goal} г.
-      Вода: ${d.water_ml} из ${pr.water_goal} мл.
-      Приёмы пищи: ${d.meals.map(m => m.name).join(', ') || 'Пока пусто'}.
+  const groups = useMemo(() =>
+    MEAL_TYPES
+      .map(type => ({ type, items: d.meals.filter(m => m.meal_type === type) }))
+      .filter(group => group.items.length > 0),
+  [d.meals])
 
-      Твоя задача: Верни ТОЛЬКО JSON-массив из 3-х строк. Каждая строка - это короткий и персонализированный совет на текущий день, учитывая перебор или недобор КБЖУ. Без приветствий, без markdown, только валидный JSON.
-      Пример: ["Отличный старт дня, но не хватает белков.", "Выпей еще стакан воды.", "На ужин лучше выбрать рыбу."]`;
+  const {
+    tipsOpen,
+    aiTips,
+    tipsLoading,
+    toggleTips,
+  } = useAiTips({
+    day,
+    dayLabel,
+    nutrition: d,
+    profile: pr,
+  })
 
-      const res = await sendChatMessage({ messages: [{ role: 'user', content: prompt }] })
-      const raw = res?.candidates?.[0]?.content?.parts?.[0]?.text || ''
-      const jsonMatch = raw.match(/\[[\s\S]*\]/)
-      if (!jsonMatch) throw new Error('Failed to parse AI response')
-      const tipsArray = JSON.parse(jsonMatch[0])
+  const addWaterWithValidation = useCallback(async (ml) => {
+    const MAX_DAILY_WATER = 10000
+    const MAX_SINGLE_INTAKE = 2000
 
-      setAiTips(tipsArray)
-      const dStr = day.format('YYYY-MM-DD')
-      globalAiTipsCache[dStr] = { ...(globalAiTipsCache[dStr] || {}), tips: tipsArray }
-    } catch (e) {
-      const errTips = ["Не удалось загрузить советы от ИИ на данный момент. Попробуйте позже."]
-      setAiTips(errTips)
-      const dStr = day.format('YYYY-MM-DD')
-      globalAiTipsCache[dStr] = { ...(globalAiTipsCache[dStr] || {}), tips: errTips }
+    if (ml > MAX_SINGLE_INTAKE) {
+      alert(t('today.water_warning_single') || `⚠️ Warning: Drinking more than ${MAX_SINGLE_INTAKE}ml at once can be dangerous. Please add smaller portions.`)
+      return
     }
-    setTipsLoading(false)
-  }
 
-  const handleToggleTips = () => {
+    const newTotal = (d.water_ml || 0) + ml
+    if (newTotal > MAX_DAILY_WATER) {
+      alert(t('today.water_warning_daily') || `⚠️ Warning: Total water intake would exceed ${MAX_DAILY_WATER}ml (${MAX_DAILY_WATER / 1000}L) per day, which can be dangerous. Current: ${d.water_ml || 0}ml`)
+      return
+    }
+
     tapHaptic()
-    const dStr = day.format('YYYY-MM-DD')
-    if (!tipsOpen) {
-      setTipsOpen(true)
-      globalAiTipsCache[dStr] = { ...(globalAiTipsCache[dStr] || {}), open: true }
-      loadAiTips()
-    } else {
-      setTipsOpen(false)
-      globalAiTipsCache[dStr] = { ...(globalAiTipsCache[dStr] || {}), open: false }
+
+    if (isOffline) {
+      queueWaterOffline(ml)
+      successHaptic()
+      return
     }
-  }
+
+    await logWater({ day: day.format('YYYY-MM-DD'), amount_ml: ml })
+    successHaptic()
+    load()
+  }, [d.water_ml, day, isOffline, load, queueWaterOffline, t])
+
+  const handleDeleteMeal = useCallback((mealId) => {
+    deleteMeal(mealId).then(load)
+  }, [load])
+
+  const handleAddMeal = useCallback(async (meal) => {
+    if (isOffline) {
+      queueAddMealOffline(meal)
+      setModalOpen(false)
+      return
+    }
+
+    await addMeal({ ...meal, day: day.format('YYYY-MM-DD') })
+    await load()
+    setModalOpen(false)
+  }, [day, isOffline, load, queueAddMealOffline])
 
   return (
     <>
-      {/* Заголовок + навигация по дням */}
-      <div className="page-header">
-        <div className="page-title">Nut<span>rio</span></div>
-        <div className="date-nav">
-          <button className="date-nav-btn" onClick={() => { tapHaptic(); setDay(d => d.subtract(1, 'day')) }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
-          </button>
-          <span className="date-nav-label">{dayLabel}</span>
-          <button className="date-nav-btn" onClick={() => { tapHaptic(); setDay(d => d.add(1, 'day')) }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M9 18l6-6-6-6" /></svg>
-          </button>
-        </div>
-      </div>
+      <TodayHeader
+        dayLabel={dayLabel}
+        onPrevDay={() => setDay(prev => prev.subtract(1, 'day'))}
+        onNextDay={() => setDay(prev => prev.add(1, 'day'))}
+      />
 
-      {/* Индикатор оффлайн режима */}
       {isOffline && (
-        <div style={{
-          background: 'rgba(251, 146, 60, 0.1)',
-          border: '1px solid rgba(251, 146, 60, 0.3)',
-          borderRadius: 'var(--r)',
-          padding: '12px 16px',
-          marginBottom: 16,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          animation: 'fade-in 0.3s ease'
-        }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth={2} strokeLinecap="round">
-            <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" />
-          </svg>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#fb923c', marginBottom: 2 }}>
-              {t('common.offline')}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text2)' }}>
-              {hasUnsyncedData
-                ? t('common.offline_toast')
-                : t('common.offline_desc')}
-            </div>
-          </div>
-        </div>
+        <StatusBanner
+          variant="offline"
+          title={t('common.offline')}
+          description={hasUnsyncedData ? t('common.offline_toast') : t('common.offline_desc')}
+        />
       )}
 
-      {/* Индикатор синхронизации */}
       {syncing && (
-        <div style={{
-          background: 'rgba(59, 130, 246, 0.1)',
-          border: '1px solid rgba(59, 130, 246, 0.3)',
-          borderRadius: 'var(--r)',
-          padding: '12px 16px',
-          marginBottom: 16,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          animation: 'fade-in 0.3s ease'
-        }}>
-          <div style={{
-            width: 18,
-            height: 18,
-            border: '2px solid rgba(59, 130, 246, 0.3)',
-            borderTopColor: '#3b82f6',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite'
-          }} />
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#3b82f6' }}>
-            {t('common.syncing') || 'Синхронізація...'}
-          </div>
-        </div>
+        <StatusBanner
+          variant="syncing"
+          title={t('common.syncing') || 'Синхронізація...'}
+        />
       )}
 
-      {/* Индикатор несинхронизированных данных */}
       {showSyncSuccess && (
-        <div style={{
-          background: 'rgba(34, 197, 94, 0.1)',
-          border: '1px solid rgba(34, 197, 94, 0.3)',
-          borderRadius: 'var(--r)',
-          padding: '12px 16px',
-          marginBottom: 16,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          animation: 'fade-in 0.3s ease'
-        }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth={2} strokeLinecap="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#22c55e' }}>
-            {t('common.synced_toast')}
-          </div>
-        </div>
+        <StatusBanner
+          variant="success"
+          title={t('common.synced_toast')}
+        />
       )}
 
-      {/* Калории + макросы */}
-      <div className="card" style={{ '--i': 0 }}>
-        {!data
-          ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'flex', gap: 16 }}>
-                <div className="skeleton skeleton-circle" style={{ width: 118, height: 118, flexShrink: 0 }} />
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 8 }}>
-                  <div className="skeleton skeleton-line" style={{ width: '80%' }} />
-                  <div className="skeleton skeleton-line" style={{ width: '60%' }} />
-                  <div className="skeleton skeleton-line" style={{ width: '70%' }} />
-                </div>
-              </div>
-              <div className="skeleton skeleton-line" style={{ height: 16, width: '100%' }} />
-            </div>
-          ) : (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <Ring eaten={d.total_calories} goal={pr.calories_goal} />
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {macros.map(m => (
-                    <div key={m.l} className="macro-row">
-                      <div className="macro-head">
-                        <span className="macro-name">{m.l}</span>
-                        <span className="macro-val">{Math.round(m.v)}<span>/{m.g}г</span></span>
-                      </div>
-                      <div className="macro-track">
-                        <div className="macro-fill" style={{ '--fill-w': Math.min((m.v / m.g) * 100, 100) + '%', background: m.c }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+      <NutritionCard
+        data={data}
+        profile={pr}
+        macros={macros}
+        remaining={remaining}
+        t={t}
+      />
 
-              <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-                {[
-                  { l: t('today.eaten'), v: Math.round(d.total_calories), c: 'var(--blue2)' },
-                  { l: t('today.goal'), v: pr.calories_goal, c: 'var(--text)' },
-                  { l: t('today.remaining'), v: t('today.remaining'), v2: remaining, c: remaining === 0 ? 'var(--red)' : 'var(--green)' },
-                ].map(s => (
-                  <div key={s.l} style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 700 }}>
-                      {s.l}
-                    </div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: s.c, marginTop: 2 }}>{s.v2 !== undefined ? s.v2 : s.v}</div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )
-        }
-      </div>
+      <WaterCard
+        waterMl={d.water_ml}
+        waterGoal={pr.water_goal}
+        waterPct={waterPct}
+        onAddWater={addWaterWithValidation}
+        t={t}
+      />
 
-      {/* Вода */}
-      <div className="card" style={{ '--i': 1 }}>
-        <div className="card-label">{t('today.water')}</div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-          <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1 }}>{d.water_ml}</span>
-          <span style={{ fontSize: 13, color: 'var(--text2)' }}>/ {pr.water_goal} {t('today.ml')}</span>
-        </div>
-        <div className="water-track">
-          <div className="water-fill" style={{ '--fill-w': waterPct + '%' }} />
-        </div>
-        <div className="water-btns">
-          {[100, 200, 250, 500].map(ml => (
-            <button key={ml} className="water-btn"
-              onClick={() => addWaterWithValidation(ml)}>
-              +{ml}
-            </button>
-          ))}
-        </div>
-      </div>
+      <AiTipsCard
+        tipsOpen={tipsOpen}
+        tipsLoading={tipsLoading}
+        aiTips={aiTips}
+        onToggle={toggleTips}
+        t={t}
+      />
 
-      {/* Подсказки */}
-      <div className="tips-block">
-        <div className="tips-header" onClick={handleToggleTips}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--blue2)" strokeWidth={2} strokeLinecap="round">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-          </svg>
-          <span className="tips-title" style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>{t('today.ai_tips')}</span>
-          {tipsLoading ? (
-            <div style={{ width: 14, height: 14, border: '2px solid var(--border)', borderTopColor: 'var(--blue2)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth={2.5} strokeLinecap="round" style={{ transition: 'transform 0.2s', transform: tipsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          )}
-        </div>
+      <MealsCard
+        isOffline={isOffline}
+        groups={groups}
+        t={t}
+        onDeleteMeal={handleDeleteMeal}
+      />
 
-        {tipsOpen && (
-          <div style={{ marginTop: 10 }}>
-            {aiTips ? (
-              aiTips.map((t, i) => (
-                <div key={i} className="tips-item" style={{ marginTop: i === 0 ? 0 : 8, fontSize: 12, color: 'var(--text2)', lineHeight: 1.4, paddingLeft: 22, position: 'relative' }}>
-                  <div style={{ position: 'absolute', left: 8, top: 6, width: 4, height: 4, borderRadius: '50%', background: 'var(--blue2)' }} />
-                  {t}
-                </div>
-              ))
-            ) : tipsLoading ? (
-              <div style={{ padding: '8px 0', fontSize: 12, color: 'var(--text3)', textAlign: 'center' }}>
-                {t('today.generating_tips')}
-              </div>
-            ) : null}
-          </div>
-        )}
-      </div>
-
-      {/* Приёмы пищи */}
-      <div className="card" style={{ '--i': 2 }}>
-        <div className="card-label">{t('today.meals')}</div>
-        {isOffline 
-          ? (
-            <div className="empty" style={{ paddingTop: 20, paddingBottom: 20 }}>
-              <div className="empty-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth={1.5} strokeLinecap="round">
-                  <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.56 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01" />
-                </svg>
-              </div>
-              <div className="empty-title">{t('common.offline')}</div>
-              <div className="empty-text">{t('common.offline_desc')}</div>
-            </div>
-          )
-          : groups.length === 0
-          ? (
-            <div className="empty" style={{ paddingTop: 20, paddingBottom: 20 }}>
-              <div className="empty-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth={1.5} strokeLinecap="round">
-                  <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM8 14s1.5 2 4 2 4-2 4-2" />
-                  <line x1="9" y1="9" x2="9.01" y2="9" />
-                  <line x1="15" y1="9" x2="15.01" y2="9" />
-                </svg>
-              </div>
-              <div className="empty-title">{t('today.empty_meals')}</div>
-              <div className="empty-text">{t('today.empty_meals_desc')}</div>
-            </div>
-          )
-          : groups.map(g => (
-            <div key={g.type}>
-              <div className="meal-group-label">{t(`meals.${g.type}`)}</div>
-              {g.items.map(m => (
-                <div key={m.id} className="meal-item">
-                  <div style={{
-                    width: 32, height: 32, borderRadius: 8,
-                    background: 'var(--bg3)', border: '1px solid var(--border)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0, color: 'var(--text2)',
-                  }}>
-                    {MealIcons[g.type]}
-                  </div>
-                  <div className="meal-info">
-                    <div className="meal-name">{m.name}</div>
-                    <div className="meal-macro">{t('today.protein')[0]}:{m.protein}{t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'} · {t('today.fat')[0]}:{m.fat}{t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'} · {t('today.carbs')[0]}:{m.carbs}{t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'} · <span className="meal-cal">{m.calories} {t('today.calories').toLowerCase().includes('кал') ? 'ккал' : 'kcal'}</span></div>
-                  </div>
-                  <button className="meal-del" onClick={() => { mediumHaptic(); deleteMeal(m.id).then(load) }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-                      <path d="M18 6 6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-          ))
-        }
-      </div>
-
-      {/* FAB + Modal — portaled to body so transform on .page doesn't break position:fixed */}
-      {ReactDOM.createPortal(
-        <>
-          <button className="fab" onClick={() => { mediumHaptic(); setModal(true) }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </button>
-          {modal && (
-            <AddModal
-              onClose={() => setModal(false)}
-              onAdd={async (meal) => {
-                successHaptic()
-
-                if (isOffline) {
-                  // Оффлайн режим: сохраняем локально
-                  addPendingSync({
-                    type: 'addMeal',
-                    data: { ...meal, day: day.format('YYYY-MM-DD') }
-                  })
-
-                  // Обновляем UI локально
-                  const newMeal = {
-                    ...meal,
-                    id: Date.now(),
-                    meal_type: meal.meal_type,
-                    created_at: new Date().toISOString()
-                  }
-
-                  setData(prev => ({
-                    ...prev,
-                    meals: [...prev.meals, newMeal],
-                    total_calories: prev.total_calories + meal.calories,
-                    total_protein: prev.total_protein + (meal.protein || 0),
-                    total_fat: prev.total_fat + (meal.fat || 0),
-                    total_carbs: prev.total_carbs + (meal.carbs || 0)
-                  }))
-
-                  setHasUnsyncedData(true)
-                  setModal(false)
-                } else {
-                  // Онлайн режим: отправляем на сервер
-                  await addMeal({ ...meal, day: day.format('YYYY-MM-DD') })
-                  await load()
-                  setModal(false)
-                }
-              }}
-            />
-          )}
-        </>,
-        document.body
-      )}
+      <TodayFabPortal
+        modalOpen={modalOpen}
+        onOpenModal={() => setModalOpen(true)}
+        onCloseModal={() => setModalOpen(false)}
+        onAddMeal={handleAddMeal}
+      />
     </>
   )
 }
