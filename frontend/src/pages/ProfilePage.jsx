@@ -1,9 +1,18 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import api, { getProfile, upsertProfile, getMe } from '../api'
 import { getTheme, toggleTheme } from '../utils/theme'
 import { tapHaptic, successHaptic, mediumHaptic } from '../utils/haptic'
 import { getSubscription, subscribeUser, unsubscribeUser, checkPushSupport } from '../utils/push'
+import './profile/ProfilePage.css'
+import ProfileHeaderCard from './profile/components/ProfileHeaderCard'
+import ProfileTabBar from './profile/components/ProfileTabBar'
+import ProfileGoalsCard from './profile/components/ProfileGoalsCard'
+import ProfileMacrosCard from './profile/components/ProfileMacrosCard'
+import ProfileSettingsCard from './profile/components/ProfileSettingsCard'
+import ProfileNotificationsCard from './profile/components/ProfileNotificationsCard'
+import ProfileAccountCard from './profile/components/ProfileAccountCard'
+import ProfileAboutCard from './profile/components/ProfileAboutCard'
 
 const GOALS = [{ v: 'lose', lKey: 'goals.lose' }, { v: 'maintain', lKey: 'goals.maintain' }, { v: 'gain', lKey: 'goals.gain' }]
 const ACTS = [{ v: 'low', lKey: 'activity.low' }, { v: 'medium', lKey: 'activity.medium' }, { v: 'high', lKey: 'activity.high' }]
@@ -61,7 +70,6 @@ export default function ProfilePage({ onLogout }) {
   }
 
   const upd = (k, v) => {
-    // Валидация: запрещаем отрицательные значения для числовых полей
     if (['weight', 'water_goal', 'calories_goal', 'protein_goal', 'fat_goal', 'carbs_goal'].includes(k)) {
       const numVal = parseFloat(v)
       if (numVal < 0 || isNaN(numVal)) return
@@ -69,203 +77,124 @@ export default function ProfilePage({ onLogout }) {
     setForm(f => ({ ...f, [k]: v }))
   }
 
+  const handleCalculateGoals = async () => {
+    setCalculating(true)
+    try {
+      const { data } = await api.post('/profile/calculate-goals', {
+        weight: form.weight,
+        height: 175,
+        age: 30,
+        gender: 'male',
+        goal: form.goal,
+        activity: form.activity,
+      })
+      setForm(f => ({ ...f, ...data }))
+      successHaptic()
+    } catch (err) {
+      console.error('Calculation failed:', err)
+      alert('Ошибка расчета целей')
+    } finally {
+      setCalculating(false)
+    }
+  }
+
   const save = async () => {
     await upsertProfile(form)
     successHaptic()
-    setSaved(true); setTimeout(() => setSaved(false), 2000)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  const handleTabChange = (nextTab) => {
+    tapHaptic()
+    setTab(nextTab)
+  }
+
+  const handleGoalSelect = (goal) => {
+    tapHaptic()
+    upd('goal', goal)
+  }
+
+  const handleActivitySelect = (activity) => {
+    tapHaptic()
+    upd('activity', activity)
+  }
+
+  const handleThemeToggle = () => {
+    tapHaptic()
+    setThemeMode(toggleTheme())
+  }
+
+  const handleLanguageChange = (language) => {
+    tapHaptic()
+    i18n.changeLanguage(language)
+  }
+
+  const handleLogout = () => {
+    mediumHaptic()
+    onLogout()
   }
 
   return (
     <>
-      <div className="page-header"><div className="page-title">{t('profile.title').slice(0, 4)}<span>{t('profile.title').slice(4)}</span></div></div>
-
-      {/* User card */}
-      {user && (
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
-          <div style={{
-            width: 50, height: 50, borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--blue2), var(--blue))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 20, fontWeight: 800, color: '#fff', flexShrink: 0,
-          }}>
-            {user.name ? user.name[0].toUpperCase() : 'U'}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 800, fontSize: 16 }}>{user.name || t('profile.user')}</div>
-            <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', background: 'var(--bg3)', borderRadius: 'var(--r-sm)', padding: 3, marginBottom: 16, gap: 2 }}>
-        {[['goals', t('profile.tabs.goals')], ['settings', t('profile.tabs.settings')]].map(([tKey, l]) => (
-          <button key={tKey} onClick={() => { tapHaptic(); setTab(tKey) }} style={{
-            flex: 1, padding: '10px 0', borderRadius: 8, border: 'none',
-            background: tab === tKey ? 'var(--bg2)' : 'none',
-            color: tab === tKey ? 'var(--text)' : 'var(--text3)',
-            fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-            boxShadow: tab === tKey ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s',
-          }}>{l}</button>
-        ))}
+      <div className="page-header">
+        <div className="page-title">{t('profile.title').slice(0, 4)}<span>{t('profile.title').slice(4)}</span></div>
       </div>
 
-      {tab === 'goals' && <>
-        <div className="card">
-          <div className="card-label">{t('profile.main_data')}</div>
-          <div className="form-group">
-            <div className="input-label">{t('profile.weight')}</div>
-            <input className="input" type="number" inputMode="decimal" min="0" step="0.1" value={form.weight} onChange={e => upd('weight', e.target.value)} />
-          </div>
-          <div className="form-group">
-            <div className="input-label">{t('profile.goal')}</div>
-            <div className="chip-row">
-              {GOALS.map(g => <button key={g.v} onClick={() => { tapHaptic(); upd('goal', g.v) }} className={`chip${form.goal === g.v ? ' active' : ''}`}>{t(g.lKey)}</button>)}
-            </div>
-          </div>
-          <div className="form-group">
-            <div className="input-label">{t('profile.activity')}</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {ACTS.map(a => (
-                <button key={a.v} onClick={() => { tapHaptic(); upd('activity', a.v) }} style={{
-                  flex: 1, padding: '10px 4px', borderRadius: 'var(--r-sm)',
-                  border: `1px solid ${form.activity === a.v ? 'var(--blue)' : 'var(--border)'}`,
-                  background: form.activity === a.v ? 'var(--blue-glow)' : 'var(--bg3)',
-                  color: form.activity === a.v ? 'var(--blue)' : 'var(--text2)',
-                  fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', textAlign: 'center',
-                }}>{t(a.lKey)}</button>
-              ))}
-            </div>
-          </div>
-          <button onClick={async () => {
-            setCalculating(true)
-            try {
-              const { data } = await api.post('/profile/calculate-goals', {
-                weight: form.weight,
-                height: 175,
-                age: 30,
-                gender: 'male',
-                goal: form.goal,
-                activity: form.activity
-              })
-              setForm(f => ({ ...f, ...data }))
-              successHaptic()
-            } catch (err) {
-              console.error('Calculation failed:', err)
-              alert('Ошибка расчета целей')
-            } finally {
-              setCalculating(false)
-            }
-          }} disabled={calculating} style={{
-            width: '100%', padding: '11px 0', borderRadius: 'var(--r-sm)',
-            border: '1px solid var(--blue)', background: 'var(--blue-glow)',
-            color: 'var(--blue)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-            opacity: calculating ? 0.6 : 1
-          }}>{calculating ? t('common.loading') || 'Расчет...' : t('profile.recalculate')}</button>
-        </div>
+      <ProfileHeaderCard user={user} t={t} />
 
-        <div className="card">
-          <div className="card-label">{t('profile.macros_goals')}</div>
-          <div className="input-row">
-            <div><div className="input-label">{t('today.calories')}</div><input className="input" type="number" min="0" value={form.calories_goal} onChange={e => upd('calories_goal', +e.target.value)} /></div>
-            <div><div className="input-label">{t('today.protein')} г</div><input className="input" type="number" min="0" value={form.protein_goal} onChange={e => upd('protein_goal', +e.target.value)} /></div>
-          </div>
-          <div className="input-row">
-            <div><div className="input-label">{t('today.fat')} г</div><input className="input" type="number" min="0" value={form.fat_goal} onChange={e => upd('fat_goal', +e.target.value)} /></div>
-            <div><div className="input-label">{t('today.carbs')} г</div><input className="input" type="number" min="0" value={form.carbs_goal} onChange={e => upd('carbs_goal', +e.target.value)} /></div>
-          </div>
-          <div className="form-group"><div className="input-label">{t('today.water')} (мл)</div><input className="input" type="number" min="0" value={form.water_goal} onChange={e => upd('water_goal', +e.target.value)} /></div>
-        </div>
+      <ProfileTabBar tab={tab} onChange={handleTabChange} t={t} />
 
-        <button className="btn-primary" onClick={save} style={{ marginBottom: 8 }}>
-          {saved ? t('common.saved') : t('common.save')}
-        </button>
-      </>}
+      {tab === 'goals' && (
+        <>
+          <ProfileGoalsCard
+            form={form}
+            goals={GOALS}
+            acts={ACTS}
+            calculating={calculating}
+            onUpdate={upd}
+            onSelectGoal={handleGoalSelect}
+            onSelectActivity={handleActivitySelect}
+            onRecalculate={handleCalculateGoals}
+            t={t}
+          />
 
-      {tab === 'settings' && <>
-        <div className="card">
-          <div className="card-label">{t('profile.appearance')}</div>
-          <div className="setting-row" style={{ cursor: 'pointer', borderBottom: '1px solid var(--border)', paddingBottom: 12, marginBottom: 12 }} onClick={() => {
-            tapHaptic()
-            setThemeMode(toggleTheme())
-          }}>
-            <span className="setting-label">{t('profile.theme')}</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text2)', fontWeight: 600 }}>
-              {themeMode === 'dark' ? t('profile.theme_dark') : t('profile.theme_light')}
-              <div style={{
-                width: 40, height: 24, borderRadius: 12, background: themeMode === 'light' ? 'var(--blue)' : 'var(--bg3)',
-                position: 'relative', transition: 'background 0.2s'
-              }}>
-                <div style={{
-                  width: 20, height: 20, borderRadius: '50%', background: '#fff',
-                  position: 'absolute', top: 2, left: themeMode === 'light' ? 18 : 2,
-                  transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                }} />
-              </div>
-            </div>
-          </div>
+          <ProfileMacrosCard form={form} onUpdate={upd} t={t} />
 
-          <div className="setting-row">
-            <span className="setting-label">{t('profile.language')}</span>
-            <select
-              value={i18n.language}
-              onChange={(e) => { tapHaptic(); i18n.changeLanguage(e.target.value) }}
-              style={{
-                background: 'var(--bg3)', border: '1px solid var(--border)',
-                color: 'var(--text)', borderRadius: 8, padding: '4px 8px',
-                fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)',
-                outline: 'none',
-              }}
-            >
-              <option value="en">English</option>
-              <option value="uk">Українська</option>
-            </select>
-          </div>
-        </div>
+          <button className="btn-primary profile-save-btn" onClick={save}>
+            {saved ? t('common.saved') : t('common.save')}
+          </button>
+        </>
+      )}
 
-        {pushSupported && (
-          <div className="card">
-            <div className="card-label">{t('profile.notifications')}</div>
-            <div className="setting-row" style={{ cursor: 'pointer' }} onClick={handlePushToggle}>
-              <span className="setting-label">{t('profile.push')}</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text2)', fontWeight: 600 }}>
-                {isSubscribed ? t('profile.push_on') : t('profile.push_off')}
-                <div style={{
-                  width: 40, height: 24, borderRadius: 12, background: isSubscribed ? 'var(--blue)' : 'var(--bg3)',
-                  position: 'relative', transition: 'background 0.2s'
-                }}>
-                  <div style={{
-                    width: 20, height: 20, borderRadius: '50%', background: '#fff',
-                    position: 'absolute', top: 2, left: isSubscribed ? 18 : 2,
-                    transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                  }} />
-                </div>
-              </div>
-            </div>
-            {isSubscribed && (
-              <div className="setting-row" style={{ cursor: 'pointer', marginTop: 8 }} onClick={testPush}>
-                <span className="setting-label" style={{ color: 'var(--blue)' }}>{t('profile.test_push')}</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" strokeWidth={2} strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-              </div>
-            )}
-          </div>
-        )}
+      {tab === 'settings' && (
+        <>
+          <ProfileSettingsCard
+            themeMode={themeMode}
+            language={i18n.language}
+            onThemeToggle={handleThemeToggle}
+            onLanguageChange={handleLanguageChange}
+            t={t}
+          />
 
-        <div className="card">
-          <div className="card-label">{t('profile.account')}</div>
-          <div className="setting-row"><span className="setting-label">Email</span><span className="setting-val">{user?.email}</span></div>
-          <div className="setting-row" style={{ cursor: 'pointer' }} onClick={() => { mediumHaptic(); onLogout(); }}>
-            <span className="setting-label" style={{ color: 'var(--red)' }}>{t('common.logout')}</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" strokeWidth={2} strokeLinecap="round"><path d="M9 18l6-6-6-6" /></svg>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-label">{t('profile.about')}</div>
-          <div className="setting-row"><span className="setting-label">{t('profile.version')}</span><span className="setting-val">2.0 PWA</span></div>
-          <div className="setting-row"><span className="setting-label">{t('profile.db')}</span><span className="setting-val">Open Food Facts</span></div>
-          <div className="setting-row"><span className="setting-label">{t('profile.ai_engine')}</span><span className="setting-val">Gemini API</span></div>
-        </div>
-      </>}
+          {pushSupported && (
+            <ProfileNotificationsCard
+              isSubscribed={isSubscribed}
+              onToggle={handlePushToggle}
+              onTestPush={testPush}
+              t={t}
+            />
+          )}
+
+          <ProfileAccountCard
+            email={user?.email}
+            onLogout={handleLogout}
+            t={t}
+          />
+
+          <ProfileAboutCard t={t} />
+        </>
+      )}
     </>
   )
 }
