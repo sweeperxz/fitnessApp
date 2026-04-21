@@ -269,12 +269,28 @@
             "pass_short": "Password — min 6 characters",
             "pass_mismatch": "Passwords don't match",
             "all_fields": "Fill all required fields",
+            "invalid_credentials": "Invalid email or password",
             "auth_error": "Auth error"
         },
         "btn": {
             "create": "Create Account",
             "login": "Login"
         }
+    },
+    "validation": {
+        "required": "This field is required",
+        "email_invalid": "Enter a valid email",
+        "min_chars": "Minimum {{count}} characters",
+        "password_uppercase": "Password must contain at least one uppercase letter",
+        "password_lowercase": "Password must contain at least one lowercase letter",
+        "password_digit": "Password must contain at least one digit",
+        "password_mismatch": "Passwords do not match",
+        "must_be_number": "Must be a number",
+        "cannot_be_negative": "Cannot be negative",
+        "min_value": "Minimum value is {{min}}",
+        "max_value": "Maximum value is {{max}}",
+        "must_be_positive": "Must be positive",
+        "too_large": "Value is too large"
     },
     "onboarding": {
         "slogan": "Your smart nutrition diary",

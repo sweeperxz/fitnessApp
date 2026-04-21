@@ -1,65 +1,67 @@
 import { useState, useCallback, useMemo } from 'react'
-
-// Validation rules
-const validators = {
-  email: (value) => {
-    if (!value) return 'Обязательное поле'
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return regex.test(value) ? null : 'Неверный формат email'
-  },
-  password: (value, minLength = 8) => {
-    if (!value) return 'Обязательное поле'
-    if (value.length < minLength) return `Минимум ${minLength} символов`
-    if (!/[A-Z]/.test(value)) return 'Должна быть хотя бы одна заглавная буква'
-    if (!/[a-z]/.test(value)) return 'Должна быть хотя бы одна строчная буква'
-    if (!/[0-9]/.test(value)) return 'Должна быть хотя бы одна цифра'
-    return null
-  },
-  confirmPassword: (value, password) => {
-    if (!value) return 'Обязательное поле'
-    if (value !== password) return 'Пароли не совпадают'
-    return null
-  },
-  name: (value) => {
-    if (!value?.trim()) return 'Обязательное поле'
-    if (value.trim().length < 2) return 'Минимум 2 символа'
-    return null
-  },
-  number: (value, min, max) => {
-    if (!value) return 'Обязательное поле'
-    const num = Number(value)
-    if (isNaN(num)) return 'Должно быть числом'
-    if (num < 0) return 'Не может быть отрицательным'
-    if (min !== undefined && num < min) return `Минимум ${min}`
-    if (max !== undefined && num > max) return `Максимум ${max}`
-    return null
-  },
-  positiveNumber: (value) => {
-    if (!value) return 'Обязательное поле'
-    const num = Number(value)
-    if (isNaN(num)) return 'Должно быть числом'
-    if (num <= 0) return 'Должно быть больше нуля'
-    return null
-  },
-  calories: (value) => {
-    if (!value) return 'Обязательное поле'
-    const num = Number(value)
-    if (isNaN(num)) return 'Должно быть числом'
-    if (num < 0) return 'Не может быть отрицательным'
-    if (num > 10000) return 'Слишком большое значение'
-    return null
-  },
-  macros: (value) => {
-    if (!value) return 'Обязательное поле'
-    const num = Number(value)
-    if (isNaN(num)) return 'Должно быть числом'
-    if (num < 0) return 'Не может быть отрицательным'
-    if (num > 1000) return 'Слишком большое значение'
-    return null
-  }
-}
+import { useTranslation } from 'react-i18next'
 
 export function useFormValidation(initialValues, validationRules) {
+  const { t } = useTranslation()
+
+  const validators = useMemo(() => ({
+    email: (value) => {
+      if (!value) return t('validation.required')
+      const regex = /^[\w.-]+@\w+\.[a-z]+(\.[a-z]+)*$/
+      return regex.test(value) ? null : t('validation.email_invalid')
+    },
+    password: (value, minLength = 8) => {
+      if (!value) return t('validation.required')
+      if (value.length < minLength) return t('validation.min_chars', { count: minLength })
+      if (!/[A-Z]/.test(value)) return t('validation.password_uppercase')
+      if (!/[a-z]/.test(value)) return t('validation.password_lowercase')
+      if (!/[0-9]/.test(value)) return t('validation.password_digit')
+      return null
+    },
+    confirmPassword: (value, password) => {
+      if (!value) return t('validation.required')
+      if (value !== password) return t('validation.password_mismatch')
+      return null
+    },
+    name: (value) => {
+      if (!value?.trim()) return t('validation.required')
+      if (value.trim().length < 2) return t('validation.min_chars', { count: 2 })
+      return null
+    },
+    number: (value, min, max) => {
+      if (!value) return t('validation.required')
+      const num = Number(value)
+      if (isNaN(num)) return t('validation.must_be_number')
+      if (num < 0) return t('validation.cannot_be_negative')
+      if (min !== undefined && num < min) return t('validation.min_value', { min })
+      if (max !== undefined && num > max) return t('validation.max_value', { max })
+      return null
+    },
+    positiveNumber: (value) => {
+      if (!value) return t('validation.required')
+      const num = Number(value)
+      if (isNaN(num)) return t('validation.must_be_number')
+      if (num <= 0) return t('validation.must_be_positive')
+      return null
+    },
+    calories: (value) => {
+      if (!value) return t('validation.required')
+      const num = Number(value)
+      if (isNaN(num)) return t('validation.must_be_number')
+      if (num < 0) return t('validation.cannot_be_negative')
+      if (num > 10000) return t('validation.too_large')
+      return null
+    },
+    macros: (value) => {
+      if (!value) return t('validation.required')
+      const num = Number(value)
+      if (isNaN(num)) return t('validation.must_be_number')
+      if (num < 0) return t('validation.cannot_be_negative')
+      if (num > 1000) return t('validation.too_large')
+      return null
+    }
+  }), [t])
+
   const [values, setValues] = useState(initialValues)
   const [errors, setErrors] = useState({})
   const [touched, setTouched] = useState({})
@@ -78,7 +80,7 @@ export function useFormValidation(initialValues, validationRules) {
     }
 
     return null
-  }, [validationRules])
+  }, [validationRules, validators])
 
   // Validate all fields
   const validateAll = useCallback(() => {
