@@ -76,6 +76,8 @@ export function useTodaySync({ day, load, setData, setIsOffline }) {
 
     try {
       const pending = getPendingSync()
+      let synced = 0
+      let rejected = 0
 
       for (const operation of pending) {
         try {
@@ -88,15 +90,24 @@ export function useTodaySync({ day, load, setData, setIsOffline }) {
           }
 
           removePendingSync(operation.id)
+          synced += 1
         } catch (e) {
-          console.error('Failed to sync operation:', e)
+          const status = e?.response?.status
+          if (status >= 400 && status < 500) {
+            removePendingSync(operation.id)
+            rejected += 1
+          }
         }
       }
 
       await load()
       refreshUnsynced()
 
-      if (pending.length > 0) {
+      if (synced > 0 || rejected > 0) {
+        window.dispatchEvent(new CustomEvent('nutrio:synced', { detail: { synced, rejected } }))
+      }
+
+      if (synced > 0) {
         successHaptic()
         setShowSyncSuccess(true)
 

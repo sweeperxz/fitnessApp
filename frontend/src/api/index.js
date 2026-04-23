@@ -1,8 +1,14 @@
 import axios from 'axios'
-import { enqueue, flush, setupAutoFlush } from '../utils/offlineQueue'
+import { enqueue, setupAutoFlush } from '../utils/offlineQueue'
 import { errorHaptic } from '../utils/haptic'
 
 const api = axios.create({ baseURL: '/api' })
+
+export const getCsrfToken = () => localStorage.getItem('ff_csrf_token')
+export const setCsrfToken = (t) => {
+  if (t) localStorage.setItem('ff_csrf_token', t)
+}
+export const removeCsrfToken = () => localStorage.removeItem('ff_csrf_token')
 
 // Retry configuration
 const MAX_RETRIES = 3
@@ -13,10 +19,22 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 export const getToken = () => localStorage.getItem('ff_token')
 export const setToken = (t) => localStorage.setItem('ff_token', t)
 export const removeToken = () => localStorage.removeItem('ff_token')
+export const clearAuthState = () => {
+  removeToken()
+  removeCsrfToken()
+}
 
 api.interceptors.request.use(cfg => {
+  cfg.headers = cfg.headers || {}
+
   const t = getToken()
   if (t) cfg.headers.Authorization = `Bearer ${t}`
+
+  const method = (cfg.method || 'get').toLowerCase()
+  if (method !== 'get' && method !== 'head' && method !== 'options') {
+    const csrfToken = getCsrfToken()
+    if (csrfToken) cfg.headers['X-CSRF-Token'] = csrfToken
+  }
 
   // Додаємо retry config якщо його немає
   if (!cfg.retryCount) cfg.retryCount = 0
@@ -25,13 +43,17 @@ api.interceptors.request.use(cfg => {
 })
 
 api.interceptors.response.use(
-  r => r,
+  r => {
+    const csrfToken = r?.data?.csrf_token
+    if (csrfToken) setCsrfToken(csrfToken)
+    return r
+  },
   async err => {
     const config = err.config
 
     // Auth error — logout
     if (err.response?.status === 401) {
-      removeToken()
+      clearAuthState()
       window.location.reload()
       return Promise.reject(err)
     }

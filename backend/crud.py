@@ -1,7 +1,76 @@
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from datetime import date, timedelta, datetime, timezone
 import models, schemas
 from cache import get_cached_profile, set_cached_profile, invalidate_profile_cache
+
+SYNC_OP_ADD_MEAL = "nutrition.add_meal"
+SYNC_OP_LOG_WATER = "nutrition.log_water"
+
+
+def _get_sync_operation(db: Session, user_id: int, op_id: str):
+    return db.query(models.SyncOperation).filter(
+        models.SyncOperation.user_id == user_id,
+        models.SyncOperation.op_id == op_id,
+    ).first()
+
+
+def _get_or_create_idempotent_resource(
+    db: Session,
+    user_id: int,
+    op_id: str,
+    expected_operation: str,
+    expected_resource_type: str,
+):
+    existing_op = _get_sync_operation(db, user_id, op_id)
+    if not existing_op:
+        return None
+
+    if existing_op.operation_type != expected_operation or existing_op.resource_type != expected_resource_type:
+        raise ValueError("op_id already used for different operation")
+
+    if expected_resource_type == "meal":
+        return db.query(models.Meal).filter(
+            models.Meal.id == existing_op.resource_id,
+            models.Meal.user_id == user_id,
+        ).first()
+
+    if expected_resource_type == "water_log":
+        return db.query(models.WaterLog).filter(
+            models.WaterLog.id == existing_op.resource_id,
+            models.WaterLog.user_id == user_id,
+        ).first()
+
+    return None
+
+
+def register_sync_operation(
+    db: Session,
+    user_id: int,
+    op_id: str,
+    operation_type: str,
+    resource_type: str,
+    resource_id: int,
+):
+    op = models.SyncOperation(
+        user_id=user_id,
+        op_id=op_id,
+        operation_type=operation_type,
+        resource_type=resource_type,
+        resource_id=resource_id,
+    )
+    db.add(op)
+    try:
+        db.commit()
+        db.refresh(op)
+        return op
+    except IntegrityError:
+        db.rollback()
+        return _get_sync_operation(db, user_id, op_id)
+
+
+def count_admin_users(db: Session) -> int:
+    return db.query(models.User).filter(models.User.role == "admin").count()
 
 # ── Profile ───────────────────────────────────────────────
 def get_profile(db: Session, user_id: int):
@@ -71,9 +140,36 @@ def get_nutrition_day(db: Session, user_id: int, day: date) -> schemas.Nutrition
     )
 
 def add_meal(db: Session, user_id: int, data: schemas.MealCreate):
-    meal = models.Meal(user_id=user_id, **data.model_dump())
+    meal_data = data.model_dump(exclude={'op_id'})
+    meal = models.Meal(user_id=user_id, **meal_data)
     db.add(meal)
-    db.commit()
+    db.flush()
+
+    if data.op_id:
+        db.add(models.SyncOperation(
+            user_id=user_id,
+            op_id=data.op_id,
+            operation_type=SYNC_OP_ADD_MEAL,
+            resource_type="meal",
+            resource_id=meal.id,
+        ))
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        if data.op_id:
+            existing = _get_or_create_idempotent_resource(
+                db,
+                user_id,
+                data.op_id,
+                SYNC_OP_ADD_MEAL,
+                "meal",
+            )
+            if existing:
+                return existing
+        raise exc
+
     db.refresh(meal)
     return meal
 
@@ -87,11 +183,58 @@ def delete_meal(db: Session, meal_id: int, user_id: int):
         db.commit()
 
 def log_water(db: Session, user_id: int, data: schemas.WaterLogCreate):
-    log = models.WaterLog(user_id=user_id, **data.model_dump())
+    water_data = data.model_dump(exclude={'op_id'})
+    log = models.WaterLog(user_id=user_id, **water_data)
     db.add(log)
-    db.commit()
+    db.flush()
+
+    if data.op_id:
+        db.add(models.SyncOperation(
+            user_id=user_id,
+            op_id=data.op_id,
+            operation_type=SYNC_OP_LOG_WATER,
+            resource_type="water_log",
+            resource_id=log.id,
+        ))
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        if data.op_id:
+            existing = _get_or_create_idempotent_resource(
+                db,
+                user_id,
+                data.op_id,
+                SYNC_OP_LOG_WATER,
+                "water_log",
+            )
+            if existing:
+                return existing
+        raise exc
+
     db.refresh(log)
     return log
+
+
+def get_idempotent_meal(db: Session, user_id: int, op_id: str):
+    return _get_or_create_idempotent_resource(
+        db,
+        user_id,
+        op_id,
+        SYNC_OP_ADD_MEAL,
+        "meal",
+    )
+
+
+def get_idempotent_water_log(db: Session, user_id: int, op_id: str):
+    return _get_or_create_idempotent_resource(
+        db,
+        user_id,
+        op_id,
+        SYNC_OP_LOG_WATER,
+        "water_log",
+    )
 
 # ── Workouts ──────────────────────────────────────────────
 def get_workouts(db: Session, user_id: int, from_date=None, to_date=None):

@@ -121,3 +121,20 @@ class PushSubscription(Base):
     created_at = Column(DateTime, default=utcnow)
 
     user = relationship("User")
+
+
+class SyncOperation(Base):
+    __tablename__ = "sync_operations"
+    __table_args__ = (
+        Index('ix_sync_user_opid_unique', 'user_id', 'op_id', unique=True),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    op_id = Column(String, nullable=False)
+    operation_type = Column(String, nullable=False)
+    resource_type = Column(String, nullable=False)
+    resource_id = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=utcnow)
+
+    user = relationship("User")

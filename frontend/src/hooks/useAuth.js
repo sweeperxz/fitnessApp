@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getMe, login, register, googleAuth, setToken as saveToken } from '../api'
+import { getMe, login, register, googleAuth, setToken as saveToken, clearAuthState } from '../api'
 
 /**
  * Хук для управления аутентификацией
@@ -74,7 +74,7 @@ export function useAuth() {
   }
 
   const logout = () => {
-    localStorage.removeItem('token')
+    clearAuthState()
     setUser(null)
   }
 

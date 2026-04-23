@@ -3,7 +3,7 @@ import { useTranslation, withTranslation } from 'react-i18next'
 import OnboardingPage from './pages/OnboardingPage'
 import AuthPage from './pages/AuthPage'
 // ... (rest of imports remains similar, but I'll provide the specific chunks)
-import { getToken, getMe, removeToken } from './api'
+import { getToken, getMe, clearAuthState } from './api'
 import OfflineToast from './components/OfflineToast'
 import useSwipe from './utils/useSwipe'
 import { tapHaptic, successHaptic, errorHaptic } from './utils/haptic'
@@ -185,7 +185,7 @@ export default function App() {
           setStatus(hp ? 'app' : 'onboarding')
           setRole(localStorage.getItem('_nutrio_role') || 'user')
         } else {
-          removeToken()
+          clearAuthState()
           setStatus('auth')
         }
       })
@@ -243,7 +243,7 @@ export default function App() {
   if (status === 'auth') return <AuthPage onAuth={d => { setStatus(d.has_profile ? 'app' : 'onboarding'); setRole(d.role || 'user') }} />
   if (status === 'onboarding') return <OnboardingPage onDone={() => setStatus('app')} />
 
-  const handleLogout = () => { removeToken(); setStatus('auth') }
+  const handleLogout = () => { clearAuthState(); setStatus('auth') }
 
   return (
     // This div is #root's direct child — fills 100% height via flex

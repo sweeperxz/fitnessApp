@@ -8,6 +8,7 @@
 const STORAGE_KEY = 'nutrio_offline_queue'
 const listeners = new Set()
 
+
 // ── Queue CRUD ──────────────────────────────────────────
 
 function getQueue() {
@@ -51,12 +52,13 @@ export function onQueueChange(fn) {
 let flushing = false
 
 export async function flush(axiosInstance) {
-    if (flushing) return { synced: 0, failed: 0 }
+    if (flushing) return { synced: 0, failed: 0, rejected: 0 }
     const queue = getQueue()
-    if (!queue.length) return { synced: 0, failed: 0 }
+    if (!queue.length) return { synced: 0, failed: 0, rejected: 0 }
 
     flushing = true
     let synced = 0
+    let rejected = 0
     const failed = []
 
     for (const item of queue) {
@@ -68,19 +70,23 @@ export async function flush(axiosInstance) {
             }
             synced++
         } catch (err) {
-            // If it's still a network error, keep in queue
             if (!err.response) {
                 failed.push(item)
+                continue
+            }
+
+            const status = err.response.status
+            if (status >= 400 && status < 500) {
+                rejected++
             } else {
-                // Server returned an error (e.g. 404, 400) — discard, it won't help to retry
-                synced++
+                failed.push(item)
             }
         }
     }
 
     saveQueue(failed)
     flushing = false
-    return { synced, failed: failed.length }
+    return { synced, failed: failed.length, rejected }
 }
 
 // ── Auto-sync when back online ──────────────────────────
@@ -93,7 +99,7 @@ export function setupAutoFlush(axiosInstance, onSynced) {
 
     window.addEventListener('online', async () => {
         const result = await flush(axiosInstance)
-        if (result.synced > 0) {
+        if (result.synced > 0 || result.rejected > 0) {
             onSynced?.(result)
         }
     })

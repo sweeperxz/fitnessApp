@@ -58,6 +58,9 @@ app.add_middleware(
 # ── Routers ───────────────────────────────────────────────
 app.include_router(profile.router)
 
+MAX_SINGLE_WATER_INTAKE_ML = 2000
+MAX_DAILY_WATER_ML = 10000
+
 # ── Health ────────────────────────────────────────────────
 @app.get("/health")
 def health(db: Session = Depends(get_db)):
@@ -136,12 +139,13 @@ def me(user: models.User = Depends(get_current_user), db: Session = Depends(get_
     profile = crud.get_profile(db, user.id)
     csrf_token = generate_csrf_token(user.id)
     return schemas.TokenResponse(
-        access_token=csrf_token,  # Повертаємо CSRF токен замість порожнього рядка
+        access_token="",
         user_id=user.id,
         name=user.name,
         email=user.email,
         role=user.role,
-        has_profile=bool(profile and profile.goal)
+        has_profile=bool(profile and profile.goal),
+        csrf_token=csrf_token,
     )
 
 # ── Admin ──────────────────────────────────────────────────
@@ -168,12 +172,23 @@ def update_role(
     # Перевірка CSRF токена
     if not verify_csrf_token(csrf_token, admin.id):
         raise HTTPException(403, "Невалідний CSRF токен")
+
     # Защита от снятия админки самому себе
     if user_id == admin.id and data.role != 'admin':
         raise HTTPException(400, "Нельзя снять роль администратора самому себе")
-    user = crud.update_user_role(db, user_id, data.role)
-    if not user:
+
+    target_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not target_user:
         raise HTTPException(404, "Пользователь не найден")
+
+    if target_user.role == 'admin' and data.role != 'admin':
+        if crud.count_admin_users(db) <= 1:
+            raise HTTPException(400, detail={
+                "code": "LAST_ADMIN_PROTECTED",
+                "message": "Нельзя снять роль у последнего администратора",
+            })
+
+    user = crud.update_user_role(db, user_id, data.role)
     return user
 
 @app.delete("/admin/users/{user_id}")
@@ -188,6 +203,17 @@ def delete_user(
         raise HTTPException(403, "Невалідний CSRF токен")
     if user_id == admin.id:
         raise HTTPException(400, "Нельзя удалить самого себя")
+
+    target_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(404, "Пользователь не найден")
+
+    if target_user.role == 'admin' and crud.count_admin_users(db) <= 1:
+        raise HTTPException(400, detail={
+            "code": "LAST_ADMIN_PROTECTED",
+            "message": "Нельзя удалить последнего администратора",
+        })
+
     success = crud.delete_user(db, user_id)
     if not success:
         raise HTTPException(404, "Пользователь не найден")
@@ -220,16 +246,31 @@ def get_nutrition(day: date, user: models.User = Depends(get_current_user), db: 
 
 @app.post("/nutrition/meal", response_model=schemas.Meal)
 def add_meal(data: schemas.MealCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    today = date.today()
+    if data.op_id:
+        try:
+            existing = crud.get_idempotent_meal(db, user.id, data.op_id)
+        except ValueError:
+            raise HTTPException(409, detail={
+                "code": "OP_ID_CONFLICT",
+                "message": "op_id already used for different operation",
+            })
+        if existing:
+            return existing
 
     # Перевіряємо чи ціль була досягнута ДО додавання
-    was_reached_before, _, _ = crud.check_goal_reached(db, user.id, today, 'calories')
+    was_reached_before, _, _ = crud.check_goal_reached(db, user.id, data.day, 'calories')
 
     # Додаємо прийом їжі
-    meal = crud.add_meal(db, user.id, data)
+    try:
+        meal = crud.add_meal(db, user.id, data)
+    except ValueError:
+        raise HTTPException(409, detail={
+            "code": "OP_ID_CONFLICT",
+            "message": "op_id already used for different operation",
+        })
 
     # Перевіряємо чи ціль досягнута ПІСЛЯ додавання
-    was_reached_after, _, _ = crud.check_goal_reached(db, user.id, today, 'calories')
+    was_reached_after, _, _ = crud.check_goal_reached(db, user.id, data.day, 'calories')
 
     # Надсилаємо нотифікацію тільки якщо ціль щойно досягнута
     if not was_reached_before and was_reached_after:
@@ -243,16 +284,51 @@ def delete_meal(meal_id: int, user: models.User = Depends(get_current_user), db:
 
 @app.post("/nutrition/water", response_model=schemas.WaterLog)
 def log_water(data: schemas.WaterLogCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    today = date.today()
+    if data.amount_ml > MAX_SINGLE_WATER_INTAKE_ML:
+        raise HTTPException(400, detail={
+            "code": "WATER_SINGLE_LIMIT_EXCEEDED",
+            "message": "Разовий об'єм води перевищує безпечний ліміт",
+            "limit_ml": MAX_SINGLE_WATER_INTAKE_ML,
+            "amount_ml": data.amount_ml,
+        })
+
+    current_daily_water = crud.get_daily_water(db, user.id, data.day)
+    projected_daily_water = current_daily_water + data.amount_ml
+    if projected_daily_water > MAX_DAILY_WATER_ML:
+        raise HTTPException(400, detail={
+            "code": "WATER_DAILY_LIMIT_EXCEEDED",
+            "message": "Добовий об'єм води перевищує безпечний ліміт",
+            "limit_ml": MAX_DAILY_WATER_ML,
+            "current_ml": current_daily_water,
+            "amount_ml": data.amount_ml,
+            "projected_ml": projected_daily_water,
+        })
+
+    if data.op_id:
+        try:
+            existing = crud.get_idempotent_water_log(db, user.id, data.op_id)
+        except ValueError:
+            raise HTTPException(409, detail={
+                "code": "OP_ID_CONFLICT",
+                "message": "op_id already used for different operation",
+            })
+        if existing:
+            return existing
 
     # Перевіряємо чи ціль була досягнута ДО додавання
-    was_reached_before, _, _ = crud.check_goal_reached(db, user.id, today, 'water')
+    was_reached_before, _, _ = crud.check_goal_reached(db, user.id, data.day, 'water')
 
     # Додаємо запис води
-    water = crud.log_water(db, user.id, data)
+    try:
+        water = crud.log_water(db, user.id, data)
+    except ValueError:
+        raise HTTPException(409, detail={
+            "code": "OP_ID_CONFLICT",
+            "message": "op_id already used for different operation",
+        })
 
     # Перевіряємо чи ціль досягнута ПІСЛЯ додавання
-    was_reached_after, _, _ = crud.check_goal_reached(db, user.id, today, 'water')
+    was_reached_after, _, _ = crud.check_goal_reached(db, user.id, data.day, 'water')
 
     # Надсилаємо нотифікацію тільки якщо ціль щойно досягнута
     if not was_reached_before and was_reached_after:

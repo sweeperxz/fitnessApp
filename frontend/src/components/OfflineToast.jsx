@@ -27,10 +27,20 @@ const OfflineToast = React.memo(function OfflineToast() {
         // When we go offline
         const handleOffline = () => show(t('common.offline_toast_desc'), 'offline', 4000)
 
-        // When synced (dispatched from api/index.js)
+        // When synced (dispatched from api/index.js and today sync)
         const handleSynced = (e) => {
-            const { synced } = e.detail || {}
-            show(`${t('common.synced_toast')} (${synced})`, 'synced', 2500)
+            const { synced = 0, rejected = 0 } = e.detail || {}
+            if (synced > 0 && rejected > 0) {
+                show(`${t('common.synced_toast')} (${synced}), ${t('common.error')} (${rejected})`, 'synced', 3000)
+                return
+            }
+            if (synced > 0) {
+                show(`${t('common.synced_toast')} (${synced})`, 'synced', 2500)
+                return
+            }
+            if (rejected > 0) {
+                show(`${t('common.error')} (${rejected})`, 'offline', 3000)
+            }
         }
 
         window.addEventListener('offline', handleOffline)

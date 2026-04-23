@@ -84,20 +84,6 @@ export default function TodayPage() {
   })
 
   const addWaterWithValidation = useCallback(async (ml) => {
-    const MAX_DAILY_WATER = 10000
-    const MAX_SINGLE_INTAKE = 2000
-
-    if (ml > MAX_SINGLE_INTAKE) {
-      alert(t('today.water_warning_single') || `⚠️ Warning: Drinking more than ${MAX_SINGLE_INTAKE}ml at once can be dangerous. Please add smaller portions.`)
-      return
-    }
-
-    const newTotal = (d.water_ml || 0) + ml
-    if (newTotal > MAX_DAILY_WATER) {
-      alert(t('today.water_warning_daily') || `⚠️ Warning: Total water intake would exceed ${MAX_DAILY_WATER}ml (${MAX_DAILY_WATER / 1000}L) per day, which can be dangerous. Current: ${d.water_ml || 0}ml`)
-      return
-    }
-
     tapHaptic()
 
     if (isOffline) {
@@ -106,10 +92,30 @@ export default function TodayPage() {
       return
     }
 
-    await logWater({ day: day.format('YYYY-MM-DD'), amount_ml: ml })
-    successHaptic()
-    load()
-  }, [d.water_ml, day, isOffline, load, queueWaterOffline, t])
+    try {
+      await logWater({ day: day.format('YYYY-MM-DD'), amount_ml: ml })
+      successHaptic()
+      load()
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      const code = typeof detail === 'object' ? detail?.code : null
+
+      if (code === 'WATER_SINGLE_LIMIT_EXCEEDED') {
+        alert(t('today.water_warning_single'))
+        return
+      }
+
+      if (code === 'WATER_DAILY_LIMIT_EXCEEDED') {
+        alert(t('today.water_warning_daily'))
+        return
+      }
+
+      const fallbackMessage = typeof detail === 'object' ? detail?.message : null
+      if (fallbackMessage) {
+        alert(fallbackMessage)
+      }
+    }
+  }, [day, isOffline, load, queueWaterOffline, t])
 
   const handleDeleteMeal = useCallback((mealId) => {
     deleteMeal(mealId).then(load)

@@ -20,6 +20,7 @@ class TokenResponse(BaseModel):
     email: str
     role: str = "user"
     has_profile: bool
+    csrf_token: Optional[str] = None
 
 class UserAdminResponse(BaseModel):
     id: int
@@ -30,7 +31,7 @@ class UserAdminResponse(BaseModel):
     class Config: from_attributes = True
 
 class UserRoleUpdate(BaseModel):
-    role: str
+    role: str = Field(..., pattern="^(user|admin)$")
 
 # ── Profile ───────────────────────────────────────────────
 class ProfileCreate(BaseModel):
@@ -53,6 +54,7 @@ class MealCreate(BaseModel):
     day: date
     meal_type: str
     name: str
+    op_id: Optional[str] = None
     calories: float = Field(default=0, ge=0, le=50000)
     protein: float = Field(default=0, ge=0, le=5000)
     fat: float = Field(default=0, ge=0, le=5000)
@@ -77,6 +79,7 @@ class NutritionDay(BaseModel):
 class WaterLogCreate(BaseModel):
     day: date
     amount_ml: int = Field(ge=0, le=20000)
+    op_id: Optional[str] = None
 
 class WaterLog(WaterLogCreate):
     id: int
