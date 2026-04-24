@@ -125,6 +125,8 @@ export const getStats = (days = 30) => api.get('/stats', { params: { days } }).t
 
 export const sendChatMessage = d => api.post('/ai/chat', d).then(r => r.data)
 
+export const searchFoods = (q, limit = 8) => api.get('/foods/search', { params: { q, limit } }).then(r => r.data)
+export const findFoodByBarcode = barcode => api.get(`/foods/barcode/${barcode}`).then(r => r.data)
 export const getRecentFoods = () => api.get('/foods/recent').then(r => r.data)
 export const addRecentFood = d => api.post('/foods/recent', d).then(r => r.data)
 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getRecentFoods, addRecentFood } from '../../api'
-import { parseOFF } from '../../utils/openFoodFacts'
+import { getRecentFoods, addRecentFood, searchFoods } from '../../api'
 
 export default function SearchTab({ onSelect }) {
     const { t } = useTranslation()
@@ -30,27 +29,8 @@ export default function SearchTab({ onSelect }) {
         const timer = setTimeout(async () => {
             setLoading(true); setDone(true)
             try {
-                // Сначала ищем по Украине
-                const r = await fetch(
-                    `https://world.openfoodfacts.org/cgi/search.pl?` +
-                    `search_terms=${encodeURIComponent(query)}&action=process&json=1&page_size=30` +
-                    `&fields=product_name,product_name_ru,product_name_ua,brands,nutriments` +
-                    `&tagtype_0=countries&tag_contains_0=contains&tag_0=ukraine`
-                )
-                const d = await r.json()
-                let parsed = (d.products || []).map(parseOFF).filter(p => p.calories > 0).slice(0, 8)
-
-                // Если пусто — глобальный поиск
-                if (parsed.length === 0) {
-                    const r2 = await fetch(
-                        `https://world.openfoodfacts.org/cgi/search.pl?` +
-                        `search_terms=${encodeURIComponent(query)}&action=process&json=1&page_size=20` +
-                        `&fields=product_name,product_name_ru,product_name_ua,brands,nutriments`
-                    )
-                    const d2 = await r2.json()
-                    parsed = (d2.products || []).map(parseOFF).filter(p => p.calories > 0).slice(0, 8)
-                }
-                setResults(parsed)
+                const foods = await searchFoods(query, 8)
+                setResults(foods)
             } catch { setResults([]) }
             setLoading(false)
         }, 400)

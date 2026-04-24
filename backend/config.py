@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     # Gemini API
     GEMINI_API_KEY: str
 
+    # FatSecret API
+    FATSECRET_CLIENT_ID: str 
+    FATSECRET_CLIENT_SECRET: str
+    FATSECRET_SCOPE: str 
+
     # Rate Limiting
     RATE_LIMIT_LOGIN_ATTEMPTS: int = 5
     RATE_LIMIT_LOGIN_WINDOW: int = 300  # 5 минут в секундах

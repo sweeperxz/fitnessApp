@@ -13,6 +13,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 import models, schemas, crud
+from services import fatsecret_service
 from database import SessionLocal, engine
 from auth import get_db, get_current_user, get_admin_user, hash_password, verify_password, create_token, validate_password_strength
 from config import settings
@@ -410,6 +411,37 @@ async def ai_chat(data: schemas.ChatRequest, user: models.User = Depends(get_cur
         except Exception as e:
             logger.error(f"Internal AI chat error: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при обращении к AI")
+
+
+@app.get("/foods/search", response_model=list[schemas.FoodItemBase])
+async def search_foods(
+    q: str,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    limit: int = 8,
+):
+    query = q.strip()
+    if len(query) < 2:
+        return []
+
+    profile = crud.get_profile(db, user.id)
+    region = getattr(profile, "fatsecret_region", None) if profile else None
+    return await fatsecret_service.search_foods(query, limit, region=region)
+
+
+@app.get("/foods/barcode/{barcode}", response_model=schemas.FoodItemBase)
+async def find_food_by_barcode(
+    barcode: str,
+    user: models.User = Depends(get_current_user),
+):
+    clean_barcode = "".join(ch for ch in barcode if ch.isdigit())
+    if not clean_barcode:
+        raise HTTPException(400, "Invalid barcode")
+
+    food = await fatsecret_service.get_food_by_barcode(clean_barcode)
+    if not food:
+        raise HTTPException(404, "Food not found")
+    return food
 
 
 @app.get("/foods/recent", response_model=list[schemas.FoodItemResponse])

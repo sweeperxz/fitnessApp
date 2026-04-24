@@ -282,3 +282,4 @@ skills-lock.json
 
 # Vite PWA
 frontend/dev-dist/
+.claude/

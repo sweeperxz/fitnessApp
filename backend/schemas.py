@@ -43,6 +43,7 @@ class ProfileCreate(BaseModel):
     protein_goal: int = Field(..., ge=0, le=500, description="Цель по белкам в г")
     fat_goal: int = Field(..., ge=0, le=500, description="Цель по жирам в г")
     carbs_goal: int = Field(..., ge=0, le=1000, description="Цель по углеводам в г")
+    fatsecret_region: str = Field(default="default", pattern="^(default|us|ua|uk|fr|de|it|es|ca|au|nz|ie|in|sg|za)$")
 
 class Profile(ProfileCreate):
     id: int

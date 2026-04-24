@@ -1,6 +1,16 @@
 import React from 'react'
 
-export default function ProfileSettingsCard({ themeMode, language, onThemeToggle, onLanguageChange, t }) {
+const REGION_OPTIONS = ['default', 'ua', 'us', 'uk', 'fr', 'de', 'it', 'es', 'ca', 'au', 'nz', 'ie', 'in', 'sg', 'za']
+
+export default function ProfileSettingsCard({
+  themeMode,
+  language,
+  fatsecretRegion,
+  onThemeToggle,
+  onLanguageChange,
+  onFatsecretRegionChange,
+  t,
+}) {
   const isLight = themeMode === 'light'
 
   return (
@@ -27,6 +37,19 @@ export default function ProfileSettingsCard({ themeMode, language, onThemeToggle
         >
           <option value="en">English</option>
           <option value="uk">Українська</option>
+        </select>
+      </div>
+
+      <div className="setting-row">
+        <span className="setting-label">{t('profile.fatsecret_region')}</span>
+        <select
+          className="profile-language-select"
+          value={fatsecretRegion}
+          onChange={e => onFatsecretRegionChange(e.target.value)}
+        >
+          {REGION_OPTIONS.map(region => (
+            <option key={region} value={region}>{t(`profile.fatsecret_region_${region}`)}</option>
+          ))}
         </select>
       </div>
     </div>

@@ -25,16 +25,17 @@ class User(Base):
 
 class Profile(Base):
     __tablename__ = "profiles"
-    id            = Column(Integer, primary_key=True)
-    user_id       = Column(Integer, ForeignKey("users.id"), unique=True, index=True)
-    weight        = Column(Float, default=70)
-    goal          = Column(String, default="")
-    activity      = Column(String, default="medium")
-    water_goal    = Column(Integer, default=2500)
-    calories_goal = Column(Integer, default=2000)
-    protein_goal  = Column(Integer, default=150)
-    fat_goal      = Column(Integer, default=70)
-    carbs_goal    = Column(Integer, default=250)
+    id                = Column(Integer, primary_key=True)
+    user_id           = Column(Integer, ForeignKey("users.id"), unique=True, index=True)
+    weight            = Column(Float, default=70)
+    goal              = Column(String, default="")
+    activity          = Column(String, default="medium")
+    water_goal        = Column(Integer, default=2500)
+    calories_goal     = Column(Integer, default=2000)
+    protein_goal      = Column(Integer, default=150)
+    fat_goal          = Column(Integer, default=70)
+    carbs_goal        = Column(Integer, default=250)
+    fatsecret_region  = Column(String, default="default")
 
     user = relationship("User", back_populates="profile")
 

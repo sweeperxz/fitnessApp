@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import BarcodeScanner from '../BarcodeScanner'
-import { parseOFF } from '../../utils/openFoodFacts'
-import { addRecentFood } from '../../api'
+import { addRecentFood, findFoodByBarcode } from '../../api'
 
 export default function BarcodeTab({ onSelect }) {
     const [scanning, setScanning] = useState(false)
@@ -15,20 +14,14 @@ export default function BarcodeTab({ onSelect }) {
         if (!bc) return
         setLoading(true); setError(''); setFound(null)
         try {
-            const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${bc}.json`)
-            const d = await r.json()
-            if (d.status === 1 && d.product) {
-                const item = parseOFF(d.product)
-                if (item.calories > 0) {
-                    setFound(item)
-                } else {
-                    setError('Продукт найден, но данные КБЖУ отсутствуют.')
-                }
-            } else {
+            const item = await findFoodByBarcode(bc)
+            setFound(item)
+        } catch (err) {
+            if (err.response?.status === 404) {
                 setError(`Штрихкод ${bc} не найден.\nПопробуй добавить вручную.`)
+            } else {
+                setError('Ошибка соединения. Проверь интернет.')
             }
-        } catch {
-            setError('Ошибка соединения. Проверь интернет.')
         }
         setLoading(false)
     }

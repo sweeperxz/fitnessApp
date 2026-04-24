@@ -19,7 +19,7 @@ const ACTS = [{ v: 'low', lKey: 'activity.low' }, { v: 'medium', lKey: 'activity
 
 export default function ProfilePage({ onLogout }) {
   const { t, i18n } = useTranslation()
-  const [form, setForm] = useState({ weight: 70, goal: 'maintain', activity: 'medium', water_goal: 2500, calories_goal: 2000, protein_goal: 150, fat_goal: 70, carbs_goal: 250 })
+  const [form, setForm] = useState({ weight: 70, goal: 'maintain', activity: 'medium', water_goal: 2500, calories_goal: 2000, protein_goal: 150, fat_goal: 70, carbs_goal: 250, fatsecret_region: 'default' })
   const [user, setUser] = useState(null)
   const [tab, setTab] = useState('goals')
   const [saved, setSaved] = useState(false)
@@ -172,8 +172,10 @@ export default function ProfilePage({ onLogout }) {
           <ProfileSettingsCard
             themeMode={themeMode}
             language={i18n.language}
+            fatsecretRegion={form.fatsecret_region}
             onThemeToggle={handleThemeToggle}
             onLanguageChange={handleLanguageChange}
+            onFatsecretRegionChange={value => upd('fatsecret_region', value)}
             t={t}
           />
 
@@ -193,6 +195,10 @@ export default function ProfilePage({ onLogout }) {
           />
 
           <ProfileAboutCard t={t} />
+
+          <button className="btn-primary profile-save-btn" onClick={save}>
+            {saved ? t('common.saved') : t('common.save')}
+          </button>
         </>
       )}
     </>
