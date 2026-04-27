@@ -4,7 +4,6 @@ export default function InstallBanner() {
   const [prompt, setPrompt] = useState(null)
   const [show, setShow] = useState(false)
   const [isIOS, setIsIOS] = useState(false)
-  const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
     // Уже установлено — не показываем
@@ -42,18 +41,10 @@ export default function InstallBanner() {
     localStorage.setItem('pwa_banner_dismissed', '1')
   }
 
-  if (!show || dismissed) return null
+  if (!show) return null
 
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200,
-      background: 'var(--bg2)',
-      borderBottom: '1px solid var(--border)',
-      padding: '12px 16px',
-      display: 'flex', alignItems: 'center', gap: 12,
-      animation: 'slideDown 0.3s ease',
-      maxWidth: 480, margin: '0 auto'
-    }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200, maxWidth: 480, margin: '0 auto', background: 'var(--bg2)', borderBottom: '1px solid var(--border)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, animation: 'slideDown 0.3s ease' }}>
       <div style={{ fontSize: 28, flexShrink: 0 }}>📲</div>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
@@ -67,18 +58,28 @@ export default function InstallBanner() {
         </div>
       </div>
       {!isIOS && (
-        <button onClick={install} style={{
-          background: 'var(--blue)', color: '#fff', border: 'none',
-          borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 700,
-          cursor: 'pointer', flexShrink: 0, fontFamily: 'var(--font)'
-        }}>
+        <button
+          onClick={install}
+          style={{
+            flexShrink: 0,
+            background: 'var(--blue)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 8,
+            padding: '8px 14px',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            fontFamily: 'var(--font)',
+          }}
+        >
           Установить
         </button>
       )}
-      <button onClick={dismiss} style={{
-        background: 'none', border: 'none', color: 'var(--text3)',
-        cursor: 'pointer', fontSize: 18, padding: 4, flexShrink: 0
-      }}>✕</button>
+      <button
+        onClick={dismiss}
+        style={{ flexShrink: 0, background: 'transparent', border: 'none', color: 'var(--text3)', fontSize: 18, padding: 4, cursor: 'pointer' }}
+      >✕</button>
     </div>
   )
 }

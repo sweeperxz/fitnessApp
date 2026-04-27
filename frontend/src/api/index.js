@@ -77,7 +77,7 @@ api.interceptors.response.use(
     // Network error on write request → save to offline queue
     if (!err.response && config) {
       const method = config.method
-      if (method === 'post' || method === 'delete') {
+      if ((method === 'post' || method === 'put' || method === 'delete') && !config.skipOfflineQueue) {
         errorHaptic()
         enqueue(method, config.url, config.data ? JSON.parse(config.data) : null)
         // Return a fake success so the UI doesn't show an error

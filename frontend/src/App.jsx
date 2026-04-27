@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, useCallback } from 'react'
+import React, { useState, useEffect, Suspense, useCallback, useMemo } from 'react'
 import { useTranslation, withTranslation } from 'react-i18next'
 import OnboardingPage from './pages/OnboardingPage'
 import AuthPage from './pages/AuthPage'
@@ -106,16 +106,15 @@ const TranslatedChunkErrorBoundary = withTranslation()(ChunkErrorBoundary)
 const UpdateBanner = React.memo(function UpdateBanner() {
   const { t } = useTranslation()
   const [show, setShow] = useState(false)
-  const [worker, setWorker] = useState(null)
+  const [updateSW, setUpdateSW] = useState(null)
 
   useEffect(() => {
-    if (!('serviceWorker' in navigator)) return
-
-    // VitePWA в режиме autoUpdate сам регистрирует воркер.
-    // Нам нужно только слушать сообщения об обновлениях.
-    navigator.serviceWorker.addEventListener('message', e => {
-      if (e.data?.type === 'UPDATE_AVAILABLE') setShow(true)
-    })
+    const handleUpdateReady = (event) => {
+      setUpdateSW(() => event.detail.updateSW)
+      setShow(true)
+    }
+    window.addEventListener('nutrio:update-ready', handleUpdateReady)
+    return () => window.removeEventListener('nutrio:update-ready', handleUpdateReady)
   }, [])
 
   if (!show) return null
@@ -127,12 +126,14 @@ const UpdateBanner = React.memo(function UpdateBanner() {
         <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>{t('common.update_desc')}</div>
       </div>
       <button
-        onClick={() => { successHaptic(); worker?.postMessage({ type: 'SKIP_WAITING' }); window.location.reload() }}
+        onClick={() => { successHaptic(); updateSW?.(true) }}
         style={{ background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
         {t('common.update')}
       </button>
-      <button onClick={() => { tapHaptic(); setShow(false) }}
-        style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', fontSize: 20, lineHeight: 1, padding: '2px 4px' }}>
+      <button
+        onClick={() => { tapHaptic(); setShow(false) }}
+        style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', fontSize: 20, lineHeight: 1, padding: '2px 4px' }}
+      >
         ×
       </button>
     </div>
@@ -168,6 +169,7 @@ export default function App() {
   const [status, setStatus] = useState(null) // null | auth | onboarding | app
   const [tab, setTab] = useState('today')
   const [role, setRole] = useState('user')
+  const [hasBlockingOverlay, setHasBlockingOverlay] = useState(false)
 
   useEffect(() => {
     const token = getToken()
@@ -193,9 +195,11 @@ export default function App() {
   }, [])
 
   // ── Swipe between tabs (hooks must be before any returns!) ──
-  const TAB_ORDER = role === 'admin'
-    ? ['today', 'workouts', 'stats', 'ai', 'profile', 'admin']
-    : ['today', 'workouts', 'stats', 'ai', 'profile']
+  const TAB_ORDER = useMemo(() => (
+    role === 'admin'
+      ? ['today', 'workouts', 'stats', 'ai', 'profile', 'admin']
+      : ['today', 'workouts', 'stats', 'ai', 'profile']
+  ), [role])
 
   const swipeNextTab = useCallback(() => {
     setTab(t => {
@@ -206,7 +210,7 @@ export default function App() {
       }
       return t
     })
-  }, [])
+  }, [TAB_ORDER])
   const swipePrevTab = useCallback(() => {
     setTab(t => {
       const i = TAB_ORDER.indexOf(t)
@@ -216,8 +220,8 @@ export default function App() {
       }
       return t
     })
-  }, [])
-  const { ref: swipeRef, handlers: swipeHandlers } = useSwipe(swipeNextTab, swipePrevTab)
+  }, [TAB_ORDER])
+  const { ref: swipeRef, handlers: swipeHandlers } = useSwipe(swipeNextTab, swipePrevTab, !hasBlockingOverlay)
 
   // Loading — shimmer skeleton
   if (status === null) return (
@@ -255,8 +259,8 @@ export default function App() {
           <div className="page-enter" key={tab}>
             <TranslatedChunkErrorBoundary tab={tab}>
               <Suspense fallback={<PageSkeleton />}>
-                {tab === 'today' && <TodayPage />}
-                {tab === 'workouts' && <WorkoutsPage />}
+                {tab === 'today' && <TodayPage onBlockingOverlayChange={setHasBlockingOverlay} />}
+                {tab === 'workouts' && <WorkoutsPage onBlockingOverlayChange={setHasBlockingOverlay} />}
                 {tab === 'stats' && <StatsPage />}
                 {tab === 'ai' && <AIPage />}
                 {tab === 'profile' && <ProfilePage onLogout={handleLogout} />}

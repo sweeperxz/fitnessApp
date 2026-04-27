@@ -68,18 +68,17 @@ const OfflineToast = React.memo(function OfflineToast() {
             display: 'flex',
             alignItems: 'center',
             gap: 8,
+            maxWidth: 'calc(100vw - 32px)',
             padding: '10px 16px',
             borderRadius: 12,
-            background: isOffline ? 'rgba(251,191,36,0.15)' : 'rgba(52,211,153,0.15)',
             border: `1px solid ${isOffline ? 'rgba(251,191,36,0.3)' : 'rgba(52,211,153,0.3)'}`,
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
+            background: isOffline ? 'rgba(251,191,36,0.15)' : 'rgba(52,211,153,0.15)',
+            color: isOffline ? '#fbbf24' : '#34d399',
             fontSize: 13,
             fontWeight: 600,
-            color: isOffline ? '#fbbf24' : '#34d399',
-            animation: 'toastIn 0.3s cubic-bezier(.4,0,.2,1)',
-            maxWidth: 'calc(100vw - 32px)',
             fontFamily: 'var(--font)',
+            backdropFilter: 'blur(20px)',
+            animation: 'toastIn 0.3s cubic-bezier(.4,0,.2,1)',
         }}>
             {isOffline ? (
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">

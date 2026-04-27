@@ -19,12 +19,12 @@ const Ring = React.memo(function Ring({ eaten, goal }) {
                 <circle cx="60" cy="60" r={r} fill="none" stroke={color} strokeWidth="8"
                     strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
                     transform="rotate(-90 60 60)"
-                    style={{ transition: 'stroke-dasharray 0.7s cubic-bezier(.4,0,.2,1), stroke 0.3s' }} />
+                    style={{ transition: 'stroke-dasharray 0.7s cubic-bezier(.4,0,.2,1), stroke 0.7s cubic-bezier(.4,0,.2,1)' }} />
             </svg>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>{Math.round(eaten)}</div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 3 }}>из {goal}</div>
-                <div style={{ fontSize: 9, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.8px', marginTop: 2 }}>ккал</div>
+                <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color, marginTop: 2 }}>ккал</div>
             </div>
         </div>
     )

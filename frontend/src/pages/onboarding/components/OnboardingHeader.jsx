@@ -2,9 +2,9 @@ import React from 'react'
 
 export default function OnboardingHeader({ slogan }) {
   return (
-    <div style={{ textAlign: 'center', marginBottom: 40, marginTop: 40 }}>
+    <div style={{ margin: '40px 0', textAlign: 'center' }}>
       <div className="ob-logo">Nutrio</div>
-      <p style={{ color: 'var(--text2)', fontSize: 15, margin: 0 }}>{slogan}</p>
+      <p style={{ margin: 0, fontSize: 15, color: 'var(--text2)' }}>{slogan}</p>
     </div>
   )
 }

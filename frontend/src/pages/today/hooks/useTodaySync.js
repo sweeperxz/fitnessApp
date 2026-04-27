@@ -5,6 +5,7 @@ import {
   addPendingSync,
   getPendingSync,
   removePendingSync,
+  saveOfflineData,
 } from '../../../utils/offlineStorage'
 
 export function useTodaySync({ day, load, setData, setIsOffline }) {
@@ -32,23 +33,35 @@ export function useTodaySync({ day, load, setData, setIsOffline }) {
   }, [])
 
   const queueWaterOffline = useCallback((ml) => {
+    const dateStr = day.format('YYYY-MM-DD')
+
     addPendingSync({
       type: 'logWater',
-      data: { day: day.format('YYYY-MM-DD'), amount_ml: ml },
+      data: { day: dateStr, amount_ml: ml },
     })
 
-    setData(prev => ({
-      ...prev,
-      water_ml: prev.water_ml + ml,
-    }))
+    setData(prev => {
+      const next = {
+        meals: prev?.meals || [],
+        total_calories: prev?.total_calories || 0,
+        total_protein: prev?.total_protein || 0,
+        total_fat: prev?.total_fat || 0,
+        total_carbs: prev?.total_carbs || 0,
+        water_ml: (prev?.water_ml || 0) + ml,
+      }
+      saveOfflineData(`nutrition_${dateStr}`, next)
+      return next
+    })
 
     setHasUnsyncedData(true)
   }, [day, setData])
 
   const queueAddMealOffline = useCallback((meal) => {
+    const dateStr = day.format('YYYY-MM-DD')
+
     addPendingSync({
       type: 'addMeal',
-      data: { ...meal, day: day.format('YYYY-MM-DD') },
+      data: { ...meal, day: dateStr },
     })
 
     const newMeal = {
@@ -58,14 +71,18 @@ export function useTodaySync({ day, load, setData, setIsOffline }) {
       created_at: new Date().toISOString(),
     }
 
-    setData(prev => ({
-      ...prev,
-      meals: [...prev.meals, newMeal],
-      total_calories: prev.total_calories + meal.calories,
-      total_protein: prev.total_protein + (meal.protein || 0),
-      total_fat: prev.total_fat + (meal.fat || 0),
-      total_carbs: prev.total_carbs + (meal.carbs || 0),
-    }))
+    setData(prev => {
+      const next = {
+        meals: [...(prev?.meals || []), newMeal],
+        total_calories: (prev?.total_calories || 0) + meal.calories,
+        total_protein: (prev?.total_protein || 0) + (meal.protein || 0),
+        total_fat: (prev?.total_fat || 0) + (meal.fat || 0),
+        total_carbs: (prev?.total_carbs || 0) + (meal.carbs || 0),
+        water_ml: prev?.water_ml || 0,
+      }
+      saveOfflineData(`nutrition_${dateStr}`, next)
+      return next
+    })
 
     setHasUnsyncedData(true)
   }, [day, setData])

@@ -25,7 +25,7 @@ export default function OnboardingParamsStep({ t, fields, data, touched, fieldEr
             style={touched[field.k] && fieldErrors[field.k] ? { borderColor: 'var(--red)' } : {}}
           />
           {touched[field.k] && fieldErrors[field.k] && (
-            <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>{fieldErrors[field.k]}</div>
+            <div style={{ marginTop: 4, fontSize: 12, color: 'var(--red)' }}>{fieldErrors[field.k]}</div>
           )}
         </div>
       ))}

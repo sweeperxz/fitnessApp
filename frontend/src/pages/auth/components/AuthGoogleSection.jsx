@@ -3,7 +3,7 @@ import React from 'react'
 export default function AuthGoogleSection({ hasGoogleClientId, loading, error, t, wrapperRef, btnRef }) {
   if (!hasGoogleClientId) {
     return (
-      <div style={{ padding: '12px 14px', borderRadius: 8, marginBottom: 16, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+      <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', color: 'var(--text2)', padding: '12px 14px', borderRadius: 8, fontSize: 12, lineHeight: 1.6, marginBottom: 16 }}>
         <strong style={{ color: 'var(--amber)' }}>{t('auth.no_google')}</strong><br />
         {t('auth.add_env')}<br />
         <code style={{ color: 'var(--amber)' }}>VITE_GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com</code>
@@ -13,16 +13,8 @@ export default function AuthGoogleSection({ hasGoogleClientId, loading, error, t
 
   return (
     <>
-      <div ref={wrapperRef} style={{ position: 'relative', width: '100%', height: 48, marginBottom: 16, borderRadius: 'var(--r)', overflow: 'hidden' }}>
-        <button
-          style={{
-            width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-            background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border)',
-            borderRadius: 'var(--r)', fontSize: 14, fontWeight: 600, fontFamily: 'var(--font)',
-            cursor: 'pointer', transition: 'background 0.2s'
-          }}
-        >
+      <div ref={wrapperRef} style={{ position: 'relative', width: '100%', height: 48, borderRadius: 'var(--r)', overflow: 'hidden', marginBottom: 16 }}>
+        <button style={{ position: 'absolute', inset: 0, zIndex: 1, width: '100%', height: '100%', borderRadius: 'var(--r)', border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text)', fontSize: 14, fontWeight: 600, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, cursor: 'pointer', transition: '0.2s' }}>
           <svg width="20" height="20" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -31,14 +23,11 @@ export default function AuthGoogleSection({ hasGoogleClientId, loading, error, t
           </svg>
           {loading ? t('auth.loading') : t('auth.continue_google')}
         </button>
-        <div
-          ref={btnRef}
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2, opacity: 0 }}
-        />
+        <div ref={btnRef} style={{ position: 'absolute', inset: 0, zIndex: 2, width: '100%', height: '100%', opacity: 0 }} />
       </div>
 
       {error && (
-        <div style={{ padding: '10px 14px', borderRadius: 8, marginBottom: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 13, color: '#fca5a5' }}>
+        <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#fca5a5', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
           {error}
         </div>
       )}

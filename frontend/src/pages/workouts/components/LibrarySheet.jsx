@@ -19,9 +19,9 @@ export default function LibrarySheet({ onAdd, onClose }) {
 
   return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="modal" style={{ display: 'flex', maxHeight: '90vh', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
         <div className="modal-handle" />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div className="modal-title" style={{ marginBottom: 0 }}>{t('workouts.lib.title')}</div>
           {sel.length > 0 && (
             <button
@@ -36,7 +36,7 @@ export default function LibrarySheet({ onAdd, onClose }) {
             </button>
           )}
         </div>
-        <input className="input" placeholder={t('workouts.lib.search')} value={search} onChange={e => setSearch(e.target.value)} style={{ marginBottom: 10, flexShrink: 0 }} />
+        <input className="input" style={{ marginBottom: 10, flexShrink: 0 }} placeholder={t('workouts.lib.search')} value={search} onChange={e => setSearch(e.target.value)} />
         <div className="chip-scroll" style={{ marginBottom: 12, flexShrink: 0 }}>
           {MUSCLE_KEYS.map(m => (
             <button key={m} onClick={() => setMuscle(m)} className={`chip${muscle === m ? ' active' : ''}`}>
@@ -44,17 +44,22 @@ export default function LibrarySheet({ onAdd, onClose }) {
             </button>
           ))}
         </div>
-        <div style={{ overflowY: 'auto', flex: 1, WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {filtered.map(e => {
             const active = sel.some(x => x.n === e.n)
             return (
-              <div key={e.n} onClick={() => toggle(e)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: MCOLORS[e.m] || 'var(--text3)', flexShrink: 0 }} />
+              <div key={e.n} onClick={() => toggle(e)} style={{ display: 'flex', cursor: 'pointer', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--border)', padding: '12px 0' }}>
+                <div style={{ height: 8, width: 8, flexShrink: 0, borderRadius: '50%', background: MCOLORS[e.m] || 'var(--text3)' }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: active ? 'var(--accent)' : 'var(--text)' }}>{e.n}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>{t(`workouts.lib.muscles.${e.m}`)}</div>
+                  <div style={{ marginTop: 1, fontSize: 11, color: 'var(--text3)' }}>{t(`workouts.lib.muscles.${e.m}`)}</div>
                 </div>
-                <div style={{ width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: active ? 'var(--accent)' : 'var(--bg3)', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`, flexShrink: 0 }}>
+                <div style={{
+                  display: 'flex', height: 24, width: 24, flexShrink: 0,
+                  alignItems: 'center', justifyContent: 'center', borderRadius: '50%',
+                  border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                  background: active ? 'var(--accent)' : 'var(--bg3)',
+                }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={active ? '#000' : 'var(--text2)'} strokeWidth={3} strokeLinecap="round">
                     {active ? <path d="M20 6 9 17l-5-5" /> : <path d="M12 5v14M5 12h14" />}
                   </svg>

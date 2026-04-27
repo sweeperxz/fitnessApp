@@ -61,32 +61,37 @@ export async function flush(axiosInstance) {
     let rejected = 0
     const failed = []
 
-    for (const item of queue) {
-        try {
-            if (item.method === 'post') {
-                await axiosInstance.post(item.url, item.data)
-            } else if (item.method === 'delete') {
-                await axiosInstance.delete(item.url)
-            }
-            synced++
-        } catch (err) {
-            if (!err.response) {
-                failed.push(item)
-                continue
-            }
+    try {
+        for (const item of queue) {
+            try {
+                if (item.method === 'post') {
+                    await axiosInstance.post(item.url, item.data, { skipOfflineQueue: true })
+                } else if (item.method === 'put') {
+                    await axiosInstance.put(item.url, item.data, { skipOfflineQueue: true })
+                } else if (item.method === 'delete') {
+                    await axiosInstance.delete(item.url, { skipOfflineQueue: true })
+                }
+                synced++
+            } catch (err) {
+                if (!err.response) {
+                    failed.push(item)
+                    continue
+                }
 
-            const status = err.response.status
-            if (status >= 400 && status < 500) {
-                rejected++
-            } else {
-                failed.push(item)
+                const status = err.response.status
+                if (status >= 400 && status < 500) {
+                    rejected++
+                } else {
+                    failed.push(item)
+                }
             }
         }
-    }
 
-    saveQueue(failed)
-    flushing = false
-    return { synced, failed: failed.length, rejected }
+        saveQueue(failed)
+        return { synced, failed: failed.length, rejected }
+    } finally {
+        flushing = false
+    }
 }
 
 // ── Auto-sync when back online ──────────────────────────

@@ -8,7 +8,7 @@ export default function NutritionCard({ data, profile, macros, remaining, t }) {
         ? (
           <div className="today-nutrition-skeleton">
             <div className="today-nutrition-skeleton-top">
-              <div className="skeleton skeleton-circle" style={{ width: 118, height: 118, flexShrink: 0 }} />
+              <div className="skeleton skeleton-circle" style={{ height: 118, width: 118, flexShrink: 0 }} />
               <div className="today-nutrition-skeleton-macros">
                 <div className="skeleton skeleton-line" style={{ width: '80%' }} />
                 <div className="skeleton skeleton-line" style={{ width: '60%' }} />

@@ -4,7 +4,7 @@ export default function OnboardingFooter({ backLabel, nextLabel, onBack, onNext,
   return (
     <div className="ob-footer">
       {onBack && (
-        <button className="btn-outline" onClick={onBack} style={{ flex: '0 0 52px' }}>
+        <button className="btn-outline" style={{ flex: '0 0 52px' }} onClick={onBack}>
           {backLabel}
         </button>
       )}

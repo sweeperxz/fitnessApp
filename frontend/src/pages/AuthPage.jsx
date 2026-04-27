@@ -222,17 +222,7 @@ export default function AuthPage({ onAuth }) {
         )}
 
         {error && (
-          <div
-            style={{
-              padding: '10px 14px',
-              borderRadius: 8,
-              marginBottom: 14,
-              background: 'rgba(239,68,68,0.1)',
-              border: '1px solid rgba(239,68,68,0.2)',
-              fontSize: 13,
-              color: '#fca5a5',
-            }}
-          >
+          <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#fca5a5', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 14 }}>
             {error}
           </div>
         )}

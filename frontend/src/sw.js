@@ -6,11 +6,9 @@ const FULL_STATIC = [...new Set([...STATIC, ...INJECTED])].filter(url => {
   return true
 })
 
-const QUEUE_NAME = 'nutrio-offline-queue'
-
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(FULL_STATIC)).then(() => self.skipWaiting())
+    caches.open(CACHE).then(c => c.addAll(FULL_STATIC))
   )
 })
 
@@ -20,10 +18,6 @@ self.addEventListener('activate', e => {
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   )
-  // Уведомляем клиенты что обновление применено
-  self.clients.matchAll({ includeUncontrolled: true }).then(clients => {
-    clients.forEach(c => c.postMessage({ type: 'UPDATE_AVAILABLE' }))
-  })
 })
 
 self.addEventListener('fetch', e => {
@@ -43,38 +37,14 @@ self.addEventListener('fetch', e => {
           }
           return res
         })
-        .catch(() => caches.match(e.request).then(r => r || new Response('{"error":"offline"}', { headers: { 'Content-Type': 'application/json' } })))
+        .catch(() => caches.match(e.request).then(r => r || new Response('{"error":"offline"}', { status: 503, headers: { 'Content-Type': 'application/json' } })))
     )
     return
   }
 
-  // API POST/PUT/DELETE — network only, queue if offline
+  // API POST/PUT/DELETE — network only; app-level queues handle offline writes.
   if (url.pathname.startsWith('/api/') && ['POST', 'PUT', 'DELETE'].includes(e.request.method)) {
-    e.respondWith(
-      fetch(e.request.clone())
-        .catch(async () => {
-          // Зберігаємо запит в IndexedDB для пізнішої синхронізації
-          const requestData = {
-            url: e.request.url,
-            method: e.request.method,
-            headers: Object.fromEntries(e.request.headers.entries()),
-            body: await e.request.text(),
-            timestamp: Date.now()
-          }
-
-          await saveToQueue(requestData)
-
-          // Реєструємо background sync
-          if (self.registration.sync) {
-            await self.registration.sync.register('sync-offline-requests')
-          }
-
-          return new Response(
-            JSON.stringify({ queued: true, message: 'Request queued for sync' }),
-            { status: 202, headers: { 'Content-Type': 'application/json' } }
-          )
-        })
-    )
+    e.respondWith(fetch(e.request.clone()))
     return
   }
 
@@ -91,11 +61,6 @@ self.addEventListener('fetch', e => {
       })
       .catch(() => caches.match(e.request).then(r => r || caches.match('/index.html')))
   )
-})
-
-// Принимаем команду на skip waiting
-self.addEventListener('message', e => {
-  if (e.data?.type === 'SKIP_WAITING') self.skipWaiting()
 })
 
 //── Push Notifications ────────────────────────────────────
@@ -129,78 +94,3 @@ self.addEventListener('notificationclick', e => {
   }
 })
 
-//── Background Sync для офлайн черги ───────────────────────
-self.addEventListener('sync', e => {
-  if (e.tag === 'sync-offline-requests') {
-    e.waitUntil(syncOfflineRequests())
-  }
-})
-
-//── IndexedDB helpers ──────────────────────────────────────
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('nutrio-offline', 1)
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve(request.result)
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result
-      if (!db.objectStoreNames.contains(QUEUE_NAME)) {
-        db.createObjectStore(QUEUE_NAME, { keyPath: 'id', autoIncrement: true })
-      }
-    }
-  })
-}
-
-async function saveToQueue(requestData) {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(QUEUE_NAME, 'readwrite')
-    const store = tx.objectStore(QUEUE_NAME)
-    const request = store.add(requestData)
-    request.onsuccess = () => resolve()
-    request.onerror = () => reject(request.error)
-  })
-}
-
-async function getQueuedRequests() {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(QUEUE_NAME, 'readonly')
-    const store = tx.objectStore(QUEUE_NAME)
-    const request = store.getAll()
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
-  })
-}
-
-async function removeFromQueue(id) {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(QUEUE_NAME, 'readwrite')
-    const store = tx.objectStore(QUEUE_NAME)
-    const request = store.delete(id)
-    request.onsuccess = () => resolve()
-    request.onerror = () => reject(request.error)
-  })
-}
-
-async function syncOfflineRequests() {
-  const requests = await getQueuedRequests()
-
-  for (const req of requests) {
-    try {
-      const response = await fetch(req.url, {
-        method: req.method,
-        headers: req.headers,
-        body: req.body || undefined
-      })
-
-      if (response.ok) {
-        await removeFromQueue(req.id)
-      }
-    } catch (err) {
-      // Залишаємо в черзі для наступної спроби
-      console.log('Failed to sync request:', err)
-    }
-  }
-}

@@ -12,13 +12,13 @@ export default function OnboardingGenderStep({ t, options, selectedGender, onSel
         description={t('onboarding.steps.gender.desc')}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginBottom: 24 }}>
         {options.map(option => (
           <div
             key={option.v}
-            className={`ob-card ${selectedGender === option.v ? 'active' : ''}`}
+            className={`ob-card${selectedGender === option.v ? ' active' : ''}`}
+            style={{ flexDirection: 'column', padding: '20px 12px', textAlign: 'center' }}
             onClick={() => onSelectGender(option.v)}
-            style={{ flexDirection: 'column', textAlign: 'center', padding: '20px 12px' }}
           >
             <div className="ob-card-icon" style={{ margin: '0 auto 10px' }}>
               <OnboardingIcon d={option.icon} />

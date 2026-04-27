@@ -18,7 +18,7 @@ import { useTodayData } from './today/hooks/useTodayData'
 import { useTodaySync } from './today/hooks/useTodaySync'
 import { useAiTips } from './today/hooks/useAiTips'
 
-export default function TodayPage() {
+export default function TodayPage({ onBlockingOverlayChange }) {
   const { t, i18n } = useTranslation()
   const [day, setDay] = useState(dayjs())
   const [modalOpen, setModalOpen] = useState(false)
@@ -26,6 +26,11 @@ export default function TodayPage() {
   useEffect(() => {
     dayjs.locale(i18n.language === 'en' ? 'en' : 'uk')
   }, [i18n.language])
+
+  useEffect(() => {
+    onBlockingOverlayChange?.(modalOpen)
+    return () => onBlockingOverlayChange?.(false)
+  }, [modalOpen, onBlockingOverlayChange])
 
   const {
     data,

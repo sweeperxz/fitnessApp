@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useEffect } from 'react'
 
 const THRESHOLD = 45    // px to commit a swipe
 const MAX_SHIFT = 68    // rubber-band max during drag
@@ -23,14 +23,17 @@ const EASE_SPRING = 'cubic-bezier(0.22, 1, 0.36, 1)'   // overshot spring for en
  * @param {Function} onLeft  — swipe left  (→ next day)
  * @param {Function} onRight — swipe right (→ prev day)
  */
-export default function useSwipe(onLeft, onRight) {
+export default function useSwipe(onLeft, onRight, enabled = true) {
     const elRef = useRef(null)
     const stateRef = useRef(null)
     const onLeftRef = useRef(onLeft)
     const onRightRef = useRef(onRight)
+    const enabledRef = useRef(enabled)
+    const timersRef = useRef([])
 
     onLeftRef.current = onLeft
     onRightRef.current = onRight
+    enabledRef.current = enabled
 
     // ── DOM helpers ──────────────────────────────────────
     const setStyle = (el, transition, transform, willChange) => {
@@ -40,6 +43,33 @@ export default function useSwipe(onLeft, onRight) {
     }
 
     const reflow = (el) => void el.offsetHeight   // force browser reflow
+
+    const clearTimers = useCallback(() => {
+        timersRef.current.forEach(clearTimeout)
+        timersRef.current = []
+    }, [])
+
+    const scheduleTimer = useCallback((fn, delay) => {
+        const timer = setTimeout(() => {
+            timersRef.current = timersRef.current.filter(item => item !== timer)
+            fn()
+        }, delay)
+        timersRef.current.push(timer)
+    }, [])
+
+    const resetSwipe = useCallback(() => {
+        clearTimers()
+        stateRef.current = null
+        const el = elRef.current
+        if (!el) return
+        setStyle(el, 'none', '', '')
+    }, [clearTimers])
+
+    useEffect(() => {
+        if (!enabled) resetSwipe()
+    }, [enabled, resetSwipe])
+
+    useEffect(() => clearTimers, [clearTimers])
 
     // ── Core transition ──────────────────────────────────
     const commitSwipe = useCallback((direction) => {
@@ -55,7 +85,7 @@ export default function useSwipe(onLeft, onRight) {
                 `translateX(-${W * 1.05}px)`,
                 'transform'
             )
-            setTimeout(() => {
+            scheduleTimer(() => {
                 // Phase 2: React switches day (triggers re-render + data fetch)
                 onLeftRef.current?.()
 
@@ -69,7 +99,7 @@ export default function useSwipe(onLeft, onRight) {
                     'translateX(0)',
                     'transform'
                 )
-                setTimeout(() => { el.style.willChange = '' }, SLIDEIN_MS + 20)
+                scheduleTimer(() => { el.style.willChange = '' }, SLIDEIN_MS + 20)
             }, FLYOUT_MS)
 
         } else {
@@ -79,7 +109,7 @@ export default function useSwipe(onLeft, onRight) {
                 `translateX(${W * 1.05}px)`,
                 'transform'
             )
-            setTimeout(() => {
+            scheduleTimer(() => {
                 // Phase 2: React switches day
                 onRightRef.current?.()
 
@@ -93,13 +123,14 @@ export default function useSwipe(onLeft, onRight) {
                     'translateX(0)',
                     'transform'
                 )
-                setTimeout(() => { el.style.willChange = '' }, SLIDEIN_MS + 20)
+                scheduleTimer(() => { el.style.willChange = '' }, SLIDEIN_MS + 20)
             }, FLYOUT_MS)
         }
-    }, [])
+    }, [scheduleTimer])
 
     // ── Touch handlers ───────────────────────────────────
     const onTouchStart = useCallback((e) => {
+        if (!enabledRef.current) return
         const t = e.touches[0]
         stateRef.current = {
             startX: t.clientX,
@@ -115,6 +146,10 @@ export default function useSwipe(onLeft, onRight) {
     }, [])
 
     const onTouchMove = useCallback((e) => {
+        if (!enabledRef.current) {
+            resetSwipe()
+            return
+        }
         if (!stateRef.current) return
         const t = e.touches[0]
         const dx = t.clientX - stateRef.current.startX
@@ -140,18 +175,22 @@ export default function useSwipe(onLeft, onRight) {
 
         const el = elRef.current
         if (el) el.style.transform = clamped !== 0 ? `translateX(${clamped}px)` : ''
-    }, [])
+    }, [resetSwipe])
 
     const onTouchEnd = useCallback(() => {
+        if (!enabledRef.current) {
+            resetSwipe()
+            return
+        }
         if (!stateRef.current) return
         const { locked, lastDx } = stateRef.current
         stateRef.current = null
 
         if (locked !== 'horizontal') return
 
-        if (lastDx < -(THRESHOLD * 0.5)) {
+        if (lastDx < -THRESHOLD) {
             commitSwipe('left')
-        } else if (lastDx > THRESHOLD * 0.5) {
+        } else if (lastDx > THRESHOLD) {
             commitSwipe('right')
         } else {
             // Spring back — didn't reach threshold
@@ -164,10 +203,10 @@ export default function useSwipe(onLeft, onRight) {
                 )
             }
         }
-    }, [commitSwipe])
+    }, [commitSwipe, resetSwipe])
 
     return {
         ref: elRef,
-        handlers: { onTouchStart, onTouchMove, onTouchEnd },
+        handlers: { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel: resetSwipe },
     }
 }

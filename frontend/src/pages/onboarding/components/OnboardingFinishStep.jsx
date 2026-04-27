@@ -26,9 +26,9 @@ export default function OnboardingFinishStep({ t, previewGoals, onBack, onFinish
       {previewGoals && (
         <div className="card" style={{ marginBottom: 24 }}>
           {rows.map(row => (
-            <div key={row.l} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 0', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ color: 'var(--text2)', fontSize: 14 }}>{row.l}</span>
-              <span style={{ fontWeight: 800, fontSize: 14, color: row.c }}>{row.v}</span>
+            <div key={row.l} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', padding: '11px 0' }}>
+              <span style={{ fontSize: 14, color: 'var(--text2)' }}>{row.l}</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: row.c }}>{row.v}</span>
             </div>
           ))}
         </div>

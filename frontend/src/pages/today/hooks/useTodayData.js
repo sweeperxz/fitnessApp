@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { getNutritionDay, getProfile } from '../../../api'
 import {
   saveOfflineData,
@@ -27,15 +27,20 @@ export function useTodayData(day) {
   const [data, setData] = useState(null)
   const [profile, setProfile] = useState(null)
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
+  const loadIdRef = useRef(0)
 
   const load = useCallback(async () => {
     const dateStr = day.format('YYYY-MM-DD')
+    const loadId = ++loadIdRef.current
+    const isCurrentLoad = () => loadId === loadIdRef.current
 
     try {
       const [nutritionDay, userProfile] = await Promise.all([
         getNutritionDay(dateStr),
         getProfile().catch(() => FALLBACK_PROFILE),
       ])
+
+      if (!isCurrentLoad()) return
 
       setData(nutritionDay)
       setProfile(userProfile)
@@ -46,6 +51,8 @@ export function useTodayData(day) {
       markAsSynced(`nutrition_${dateStr}`)
       markAsSynced('profile')
     } catch (err) {
+      if (!isCurrentLoad()) return
+
       if (err.isOffline || !navigator.onLine) {
         setIsOffline(true)
 

@@ -10,13 +10,14 @@ import WorkoutsEmptyState from './workouts/components/WorkoutsEmptyState'
 import WorkoutCard from './workouts/components/WorkoutCard'
 import WorkoutsFabPortal from './workouts/components/WorkoutsFabPortal'
 
-export default function WorkoutsPage() {
+export default function WorkoutsPage({ onBlockingOverlayChange }) {
   const { t } = useTranslation()
   const [week, setWeek] = useState(dayjs())
   const [day, setDay] = useState(dayjs())
   const [workouts, setWorkouts] = useState([])
   const [modalOpen, setModalOpen] = useState(false)
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
+  const [loadError, setLoadError] = useState(false)
 
   const weekDays = useMemo(() => getWeek(week), [week])
 
@@ -24,11 +25,16 @@ export default function WorkoutsPage() {
     try {
       setWorkouts(await getWorkouts({ from_date: weekDays[0].format('YYYY-MM-DD'), to_date: weekDays[6].format('YYYY-MM-DD') }))
       setIsOffline(false)
+      setLoadError(false)
     } catch (err) {
-      if (err.isOffline || !navigator.onLine) setIsOffline(true)
-      setWorkouts([])
+      if (err.isOffline || !navigator.onLine) {
+        setIsOffline(true)
+        return
+      }
+
+      setLoadError(true)
     }
-  }, [week, weekDays])
+  }, [weekDays])
 
   useEffect(() => {
     load()
@@ -50,10 +56,15 @@ export default function WorkoutsPage() {
     }
   }, [load])
 
+  useEffect(() => {
+    onBlockingOverlayChange?.(modalOpen)
+    return () => onBlockingOverlayChange?.(false)
+  }, [modalOpen, onBlockingOverlayChange])
+
   const dayWorkouts = workouts.filter(w => w.day === day.format('YYYY-MM-DD'))
   const hasWorkoutForDay = d => workouts.some(w => w.day === d.format('YYYY-MM-DD'))
-  const totalSets = workouts.reduce((a, w) => a + w.exercises.reduce((b, e) => b + e.sets, 0), 0)
-  const totalTons = workouts.reduce((a, w) => a + w.exercises.reduce((b, e) => b + e.sets * e.reps * e.weight_kg / 1000, 0), 0)
+  const totalSets = workouts.reduce((a, w) => a + (w.exercises || []).reduce((b, e) => b + e.sets, 0), 0)
+  const totalTons = workouts.reduce((a, w) => a + (w.exercises || []).reduce((b, e) => b + e.sets * e.reps * e.weight_kg / 1000, 0), 0)
 
   const tonnageUnit = t('today.ml')[0].toLowerCase() === 'м' ? 'т' : 't'
 
@@ -79,11 +90,17 @@ export default function WorkoutsPage() {
         hasWorkoutForDay={hasWorkoutForDay}
       />
 
-      {isOffline ? (
+      {isOffline && dayWorkouts.length === 0 ? (
         <WorkoutsEmptyState
           offline
           title={t('common.offline')}
           text={t('common.offline_desc')}
+        />
+      ) : loadError && dayWorkouts.length === 0 ? (
+        <WorkoutsEmptyState
+          offline={false}
+          title={t('common.error')}
+          text={t('common.retry')}
         />
       ) : dayWorkouts.length === 0 ? (
         <WorkoutsEmptyState

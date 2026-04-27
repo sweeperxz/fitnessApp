@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getProfile, sendChatMessage } from '../api'
+import { sendChatMessage } from '../api'
 import { tapHaptic, successHaptic } from '../utils/haptic'
 import AIHeader from './ai/components/AIHeader'
 import AIWelcomeState from './ai/components/AIWelcomeState'
@@ -12,14 +12,9 @@ export default function AIPage() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [profile, setProfile] = useState(null)
   const endRef = useRef(null)
 
   const suggestions = t('ai_chat.suggest', { returnObjects: true }) || []
-
-  useEffect(() => {
-    getProfile().catch(() => null).then(p => setProfile(p))
-  }, [])
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })

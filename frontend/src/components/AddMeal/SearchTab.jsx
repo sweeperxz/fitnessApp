@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getRecentFoods, addRecentFood, searchFoods } from '../../api'
 
@@ -10,6 +10,7 @@ export default function SearchTab({ onSelect }) {
     const [done, setDone] = useState(false)
     const [recent, setRecent] = useState([])
     const [recentLoaded, setRecentLoaded] = useState(false)
+    const searchIdRef = useRef(0)
 
     useEffect(() => {
         getRecentFoods()
@@ -24,15 +25,18 @@ export default function SearchTab({ onSelect }) {
 
     useEffect(() => {
         const query = q.trim()
-        if (query.length < 2) { setResults([]); setDone(false); return }
+        const searchId = ++searchIdRef.current
+        if (query.length < 2) { setResults([]); setDone(false); setLoading(false); return }
 
         const timer = setTimeout(async () => {
             setLoading(true); setDone(true)
             try {
                 const foods = await searchFoods(query, 8)
-                setResults(foods)
-            } catch { setResults([]) }
-            setLoading(false)
+                if (searchId === searchIdRef.current) setResults(foods)
+            } catch {
+                if (searchId === searchIdRef.current) setResults([])
+            }
+            if (searchId === searchIdRef.current) setLoading(false)
         }, 400)
 
         return () => clearTimeout(timer)
@@ -51,12 +55,7 @@ export default function SearchTab({ onSelect }) {
                     onChange={e => setQ(e.target.value)}
                     style={{ flex: 1 }}
                 />
-                <div style={{
-                    width: 44, height: 44, flexShrink: 0,
-                    background: 'var(--bg3)', border: '1px solid var(--border)',
-                    borderRadius: 'var(--r-sm)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
+                <div style={{ width: 44, height: 44, borderRadius: 'var(--r-sm)', background: 'var(--bg3)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     {loading
                         ? <div style={{ width: 16, height: 16, border: '2px solid var(--text3)', borderTopColor: 'var(--blue)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                         : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth={2.5} strokeLinecap="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
@@ -65,7 +64,7 @@ export default function SearchTab({ onSelect }) {
             </div>
 
             {!isSearching && recentLoaded && recent.length > 0 && (
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>
                     {t('meals.search_recent')}
                 </div>
             )}
@@ -85,10 +84,7 @@ export default function SearchTab({ onSelect }) {
             )}
 
             {list.map((item, i) => (
-                <div key={i} onClick={() => handleSelect(item)} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '12px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer',
-                }}>
+                <div key={i} onClick={() => handleSelect(item)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
                     <div style={{ flex: 1, marginRight: 12 }}>
                         <div style={{ fontSize: 14, fontWeight: 600 }}>{item.name}</div>
                         {item.brand && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{item.brand}</div>}
@@ -97,7 +93,7 @@ export default function SearchTab({ onSelect }) {
                         </div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--blue2)' }}>{item.calories}</div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--blue2)' }}>{item.calories}</div>
                         <div style={{ fontSize: 10, color: 'var(--text3)' }}>{t('today.calories').toLowerCase().includes('кал') ? 'ккал' : 'kcal'}/100{t('today.ml')[0].toLowerCase() === 'м' ? 'г' : 'g'}</div>
                     </div>
                 </div>
