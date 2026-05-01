@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from datetime import date, timedelta, datetime, timezone
+from datetime import date, timedelta
 import models, schemas
 
 SYNC_OP_ADD_MEAL = "nutrition.add_meal"
