@@ -3,8 +3,9 @@ from typing import Optional
 import logging
 
 import httpx
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from google.oauth2 import id_token
 from google.auth.transport import requests as g_requests
@@ -20,14 +21,9 @@ from config import settings
 from routers import profile
 from csrf import generate_csrf_token, verify_csrf_token, require_csrf
 
-# Налаштування логування
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('nutrio.log')
-    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -36,8 +32,6 @@ try:
 except ImportError:
     webpush = None
     WebPushException = Exception
-
-models.Base.metadata.create_all(bind=engine)
 
 logger.info("Nutrio API starting up...")
 logger.info(f"CORS origins: {settings.cors_origins_list}")
@@ -66,8 +60,7 @@ MAX_DAILY_WATER_ML = 10000
 @app.get("/health")
 def health(db: Session = Depends(get_db)):
     try:
-        # Перевіряємо з'єднання з БД
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         return {"status": "ok", "database": "connected"}
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
@@ -75,7 +68,8 @@ def health(db: Session = Depends(get_db)):
 
 # ── Auth: email/password ──────────────────────────────────
 @app.post("/auth/register", response_model=schemas.TokenResponse)
-def register(data: schemas.RegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/15minutes")
+def register(request: Request, data: schemas.RegisterRequest, db: Session = Depends(get_db)):
     if db.query(models.User).filter(models.User.email == data.email.lower()).first():
         raise HTTPException(400, "Email уже зарегистрирован")
     is_valid, error_msg = validate_password_strength(data.password)
@@ -89,7 +83,7 @@ def register(data: schemas.RegisterRequest, db: Session = Depends(get_db)):
 @limiter.limit("5/5minutes")
 def login(request: Request, data: schemas.LoginRequest, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == data.email.lower()).first()
-    if not user or not verify_password(data.password, user.password_hash):
+    if not user or not user.password_hash or not verify_password(data.password, user.password_hash):
         raise HTTPException(401, "Неверный email или пароль")
     profile = crud.get_profile(db, user.id)
     return schemas.TokenResponse(access_token=create_token(user.id), user_id=user.id, name=user.name, email=user.email, role=user.role, has_profile=bool(profile and profile.goal))
@@ -220,16 +214,7 @@ def delete_user(
         raise HTTPException(404, "Пользователь не найден")
     return {"ok": True}
 
-# ── Profile ───────────────────────────────────────────────
-@app.get("/profile", response_model=schemas.Profile)
-def get_profile(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    p = crud.get_profile(db, user.id)
-    if not p: raise HTTPException(404, "Profile not found")
-    return p
-
-@app.post("/profile", response_model=schemas.Profile)
-def upsert_profile(data: schemas.ProfileCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return crud.upsert_profile(db, user.id, data)
+# Profile-эндпоинты вынесены в routers/profile.py.
 
 # ── Nutrition ─────────────────────────────────────────────
 @app.get("/nutrition/{day}", response_model=schemas.NutritionDay)
@@ -246,7 +231,12 @@ def get_nutrition(day: date, user: models.User = Depends(get_current_user), db: 
     return crud.get_nutrition_day(db, user.id, day)
 
 @app.post("/nutrition/meal", response_model=schemas.Meal)
-def add_meal(data: schemas.MealCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def add_meal(
+    data: schemas.MealCreate,
+    background_tasks: BackgroundTasks,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     if data.op_id:
         try:
             existing = crud.get_idempotent_meal(db, user.id, data.op_id)
@@ -275,7 +265,7 @@ def add_meal(data: schemas.MealCreate, user: models.User = Depends(get_current_u
 
     # Надсилаємо нотифікацію тільки якщо ціль щойно досягнута
     if not was_reached_before and was_reached_after:
-        send_push_notification(db, user.id, "🎯 Отлично! Дневная цель по калориям достигнута!")
+        background_tasks.add_task(send_push_notification, user.id, "🎯 Отлично! Дневная цель по калориям достигнута!")
 
     return meal
 
@@ -284,7 +274,12 @@ def delete_meal(meal_id: int, user: models.User = Depends(get_current_user), db:
     crud.delete_meal(db, meal_id, user.id); return {"ok": True}
 
 @app.post("/nutrition/water", response_model=schemas.WaterLog)
-def log_water(data: schemas.WaterLogCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def log_water(
+    data: schemas.WaterLogCreate,
+    background_tasks: BackgroundTasks,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     if data.amount_ml > MAX_SINGLE_WATER_INTAKE_ML:
         raise HTTPException(400, detail={
             "code": "WATER_SINGLE_LIMIT_EXCEEDED",
@@ -333,7 +328,7 @@ def log_water(data: schemas.WaterLogCreate, user: models.User = Depends(get_curr
 
     # Надсилаємо нотифікацію тільки якщо ціль щойно досягнута
     if not was_reached_before and was_reached_after:
-        send_push_notification(db, user.id, "💧 Супер! Вы выпили дневную норму воды!")
+        background_tasks.add_task(send_push_notification, user.id, "💧 Супер! Вы выпили дневную норму воды!")
 
     return water
 
@@ -363,7 +358,8 @@ def get_stats(days: int = 30, user: models.User = Depends(get_current_user), db:
 
 # ── AI Assistant (Gemini) ─────────────────────────────────
 @app.post("/ai/chat")
-async def ai_chat(data: schemas.ChatRequest, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def ai_chat(request: Request, data: schemas.ChatRequest, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not settings.GEMINI_API_KEY:
         raise HTTPException(500, "GEMINI_API_KEY не настроен на сервере")
 
@@ -414,7 +410,9 @@ async def ai_chat(data: schemas.ChatRequest, user: models.User = Depends(get_cur
 
 
 @app.get("/foods/search", response_model=list[schemas.FoodItemBase])
+@limiter.limit("30/minute")
 async def search_foods(
+    request: Request,
     q: str,
     user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -430,7 +428,9 @@ async def search_foods(
 
 
 @app.get("/foods/barcode/{barcode}", response_model=schemas.FoodItemBase)
+@limiter.limit("30/minute")
 async def find_food_by_barcode(
+    request: Request,
     barcode: str,
     user: models.User = Depends(get_current_user),
 ):
@@ -487,25 +487,30 @@ def add_recent_food(data: schemas.FoodItemCreate, user: models.User = Depends(ge
 
 
 # ── Push Notifications ────────────────────────────────────
-def send_push_notification(db: Session, user_id: int, message: str):
+def send_push_notification(user_id: int, message: str):
+    """Фоновая отправка push: открывает свою сессию БД, чтобы не делить её с HTTP-обработчиком."""
     if not webpush or not settings.VAPID_PRIVATE_KEY or not settings.VAPID_PUBLIC_KEY:
         return
-    subs = crud.get_push_subscriptions(db, user_id)
-    for s in subs:
-        try:
-            webpush(
-                subscription_info={"endpoint": s.endpoint, "keys": {"p256dh": s.p256dh, "auth": s.auth}},
-                data=message,
-                vapid_private_key=settings.VAPID_PRIVATE_KEY,
-                vapid_claims={"sub": settings.VAPID_EMAIL}
-            )
-        except WebPushException as e:
-            # Якщо підписка застаріла (410 Gone), видаляємо її
-            if e.response and e.response.status_code == 410:
-                db.delete(s)
-                db.commit()
-        except Exception:
-            pass
+    db = SessionLocal()
+    try:
+        subs = crud.get_push_subscriptions(db, user_id)
+        for s in subs:
+            try:
+                webpush(
+                    subscription_info={"endpoint": s.endpoint, "keys": {"p256dh": s.p256dh, "auth": s.auth}},
+                    data=message,
+                    vapid_private_key=settings.VAPID_PRIVATE_KEY,
+                    vapid_claims={"sub": settings.VAPID_EMAIL}
+                )
+            except WebPushException as e:
+                # Підписка застаріла (410 Gone) — видаляємо
+                if e.response and e.response.status_code == 410:
+                    db.delete(s)
+                    db.commit()
+            except Exception:
+                logger.exception("Failed to send push notification")
+    finally:
+        db.close()
 
 
 @app.get("/push/vapid-public-key")
