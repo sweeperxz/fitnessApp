@@ -1,28 +1,32 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { addMeal, deleteMeal, logWater } from '../../../api'
+import api from '../../../api'
 import { successHaptic } from '../../../utils/haptic'
-import {
-  addPendingSync,
-  getPendingSync,
-  removePendingSync,
-  saveOfflineData,
-} from '../../../utils/offlineStorage'
+import { enqueue, flush, getQueueSize, onQueueChange } from '../../../utils/offlineSync'
+import { saveOfflineData } from '../../../utils/offlineStorage'
 
+/**
+ * Хук синхронизации Today-страницы.
+ *
+ * До этого хранил параллельную очередь (`addPendingSync`/`getPendingSync`),
+ * которая писала в свой ключ localStorage и перезаписывала статус
+ * относительно `nutrio_offline_queue`. Сейчас использует единую очередь
+ * `offlineSync` — pending-записи проигрываются обычным axios-инстансом
+ * с тем же payload (включая `op_id`), что отдала бы UI напрямую.
+ *
+ * `saveOfflineData(...)` оставлен — это локальный read-cache, чтобы
+ * UI продолжал показывать корректное "сегодня" в оффлайне. Очередь
+ * записей и read-cache — разные вещи, не путать.
+ */
 export function useTodaySync({ day, load, setData, setIsOffline }) {
   const [syncing, setSyncing] = useState(false)
-  const [hasUnsyncedData, setHasUnsyncedData] = useState(false)
+  const [hasUnsyncedData, setHasUnsyncedData] = useState(getQueueSize() > 0)
   const [showSyncSuccess, setShowSyncSuccess] = useState(false)
   const hideSuccessTimerRef = useRef(null)
 
-  const refreshUnsynced = useCallback(() => {
-    const pending = getPendingSync()
-    setHasUnsyncedData(pending.length > 0)
-    return pending
-  }, [])
-
   useEffect(() => {
-    refreshUnsynced()
-  }, [refreshUnsynced])
+    const unsubscribe = onQueueChange((size) => setHasUnsyncedData(size > 0))
+    return unsubscribe
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -32,13 +36,15 @@ export function useTodaySync({ day, load, setData, setIsOffline }) {
     }
   }, [])
 
+  const refreshUnsynced = useCallback(() => {
+    const size = getQueueSize()
+    setHasUnsyncedData(size > 0)
+    return size
+  }, [])
+
   const queueWaterOffline = useCallback((ml) => {
     const dateStr = day.format('YYYY-MM-DD')
-
-    addPendingSync({
-      type: 'logWater',
-      data: { day: dateStr, amount_ml: ml },
-    })
+    enqueue('post', '/nutrition/water', { day: dateStr, amount_ml: ml })
 
     setData(prev => {
       const next = {
@@ -58,11 +64,7 @@ export function useTodaySync({ day, load, setData, setIsOffline }) {
 
   const queueAddMealOffline = useCallback((meal) => {
     const dateStr = day.format('YYYY-MM-DD')
-
-    addPendingSync({
-      type: 'addMeal',
-      data: { ...meal, day: dateStr },
-    })
+    enqueue('post', '/nutrition/meal', { ...meal, day: dateStr })
 
     const newMeal = {
       ...meal,
@@ -92,30 +94,8 @@ export function useTodaySync({ day, load, setData, setIsOffline }) {
     setSyncing(true)
 
     try {
-      const pending = getPendingSync()
-      let synced = 0
-      let rejected = 0
-
-      for (const operation of pending) {
-        try {
-          if (operation.type === 'addMeal') {
-            await addMeal(operation.data)
-          } else if (operation.type === 'deleteMeal') {
-            await deleteMeal(operation.data.id)
-          } else if (operation.type === 'logWater') {
-            await logWater(operation.data)
-          }
-
-          removePendingSync(operation.id)
-          synced += 1
-        } catch (e) {
-          const status = e?.response?.status
-          if (status >= 400 && status < 500) {
-            removePendingSync(operation.id)
-            rejected += 1
-          }
-        }
-      }
+      const result = await flush(api)
+      const { synced, rejected } = result
 
       await load()
       refreshUnsynced()

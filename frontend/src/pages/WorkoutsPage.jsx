@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { getWorkouts } from '../api'
+import { AppLayoutContext } from '../components/AppShell'
 import { getWeek } from './workouts/constants'
 import WorkoutsHeader from './workouts/components/WorkoutsHeader'
 import WorkoutsStats from './workouts/components/WorkoutsStats'
@@ -10,8 +11,9 @@ import WorkoutsEmptyState from './workouts/components/WorkoutsEmptyState'
 import WorkoutCard from './workouts/components/WorkoutCard'
 import WorkoutsFabPortal from './workouts/components/WorkoutsFabPortal'
 
-export default function WorkoutsPage({ onBlockingOverlayChange }) {
+export default function WorkoutsPage() {
   const { t } = useTranslation()
+  const { setBlockingOverlay } = React.useContext(AppLayoutContext)
   const [week, setWeek] = useState(dayjs())
   const [day, setDay] = useState(dayjs())
   const [workouts, setWorkouts] = useState([])
@@ -57,9 +59,9 @@ export default function WorkoutsPage({ onBlockingOverlayChange }) {
   }, [load])
 
   useEffect(() => {
-    onBlockingOverlayChange?.(modalOpen)
-    return () => onBlockingOverlayChange?.(false)
-  }, [modalOpen, onBlockingOverlayChange])
+    setBlockingOverlay?.(modalOpen)
+    return () => setBlockingOverlay?.(false)
+  }, [modalOpen, setBlockingOverlay])
 
   const dayWorkouts = workouts.filter(w => w.day === day.format('YYYY-MM-DD'))
   const hasWorkoutForDay = d => workouts.some(w => w.day === d.format('YYYY-MM-DD'))

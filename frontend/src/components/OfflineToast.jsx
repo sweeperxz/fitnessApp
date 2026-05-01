@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { onQueueChange } from '../utils/offlineQueue'
+import { onQueueChange } from '../utils/offlineSync'
 
 /**
  * OfflineToast — shows status messages for offline queue

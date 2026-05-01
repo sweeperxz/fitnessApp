@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { googleAuth, register, login, setToken } from '../api'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { googleAuth, register, login } from '../api'
+import { useAuthContext } from '../auth/AuthContext'
 import { useFormValidation } from '../hooks/useFormValidation'
 import AuthBrand from './auth/components/AuthBrand'
 import AuthGoogleSection from './auth/components/AuthGoogleSection'
@@ -23,8 +25,11 @@ function loadGSI(callback) {
   document.head.appendChild(script)
 }
 
-export default function AuthPage({ onAuth }) {
+export default function AuthPage() {
   const { t, i18n } = useTranslation()
+  const { signIn } = useAuthContext()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [sub, setSub] = useState('login')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -88,8 +93,9 @@ export default function AuthPage({ onAuth }) {
           setError('')
           try {
             const data = await googleAuth({ credential: resp.credential })
-            setToken(data.access_token)
-            onAuth(data)
+            signIn(data)
+            const fallback = data.has_profile ? '/today' : '/onboarding'
+            navigate(location.state?.from?.pathname || fallback, { replace: true })
           } catch (e) {
             setError(e.response?.data?.detail || t('auth.google_error'))
           }
@@ -126,8 +132,9 @@ export default function AuthPage({ onAuth }) {
     setLoading(true)
     try {
       const data = await (sub === 'register' ? register : login)(form)
-      setToken(data.access_token)
-      onAuth(data)
+      signIn(data)
+      const fallback = data.has_profile ? '/today' : '/onboarding'
+      navigate(location.state?.from?.pathname || fallback, { replace: true })
     } catch (e) {
       if (sub === 'login' && [400, 401].includes(e.response?.status)) {
         setError(t('auth.errors.invalid_credentials'))
@@ -136,7 +143,7 @@ export default function AuthPage({ onAuth }) {
       }
     }
     setLoading(false)
-  }, [validateAll, sub, form, onAuth, t])
+  }, [validateAll, sub, form, signIn, navigate, location.state, t])
 
   return (
     <div className="auth-wrap fade-in">

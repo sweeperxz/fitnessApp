@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import api, { getProfile, upsertProfile, getMe } from '../api'
+import { useAuthContext } from '../auth/AuthContext'
 import { getTheme, toggleTheme } from '../utils/theme'
 import { tapHaptic, successHaptic, mediumHaptic } from '../utils/haptic'
 import { getSubscription, subscribeUser, unsubscribeUser, checkPushSupport } from '../utils/push'
@@ -17,8 +19,10 @@ import ProfileAboutCard from './profile/components/ProfileAboutCard'
 const GOALS = [{ v: 'lose', lKey: 'goals.lose' }, { v: 'maintain', lKey: 'goals.maintain' }, { v: 'gain', lKey: 'goals.gain' }]
 const ACTS = [{ v: 'low', lKey: 'activity.low' }, { v: 'medium', lKey: 'activity.medium' }, { v: 'high', lKey: 'activity.high' }]
 
-export default function ProfilePage({ onLogout }) {
+export default function ProfilePage() {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
+  const { signOut } = useAuthContext()
   const [form, setForm] = useState({ weight: 70, goal: 'maintain', activity: 'medium', water_goal: 2500, calories_goal: 2000, protein_goal: 150, fat_goal: 70, carbs_goal: 250, fatsecret_region: 'default' })
   const [user, setUser] = useState(null)
   const [tab, setTab] = useState('goals')
@@ -132,7 +136,8 @@ export default function ProfilePage({ onLogout }) {
 
   const handleLogout = () => {
     mediumHaptic()
-    onLogout()
+    signOut()
+    navigate('/auth', { replace: true })
   }
 
   return (
