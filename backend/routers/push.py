@@ -9,7 +9,11 @@ import models
 import schemas
 from auth import get_current_user, get_db
 from config import settings
-from services.push_service import WebPushException, is_push_configured, webpush
+from services.push_service import (
+    is_push_configured,
+    send_push_notification_using_session,
+    webpush,
+)
 
 router = APIRouter(prefix="/push", tags=["push"])
 
@@ -48,33 +52,14 @@ def test_push(
     if not subs:
         raise HTTPException(404, "Подписки не найдены. Сначала включи уведомления в профиле.")
 
-    results = []
-    for s in subs:
-        try:
-            webpush(
-                subscription_info={
-                    "endpoint": s.endpoint,
-                    "keys": {"p256dh": s.p256dh, "auth": s.auth},
-                },
-                data="Привет от Nutrio! Уведомления работают 🎉",
-                vapid_private_key=settings.VAPID_PRIVATE_KEY,
-                vapid_claims={"sub": settings.VAPID_EMAIL},
-            )
-            results.append({"endpoint": s.endpoint, "status": "sent"})
-        except WebPushException as ex:
-            if ex.response and ex.response.status_code == 410:
-                db.delete(s)
-                db.commit()
-                results.append(
-                    {
-                        "endpoint": s.endpoint,
-                        "status": "removed",
-                        "reason": "subscription expired (410)",
-                    }
-                )
-            else:
-                results.append(
-                    {"endpoint": s.endpoint, "status": "failed", "error": str(ex)}
-                )
-
-    return {"ok": True, "results": results}
+    result = send_push_notification_using_session(
+        db, user.id, "Привет от Nutrio! Уведомления работают 🎉"
+    )
+    return {
+        "ok": True,
+        "sent": result.sent,
+        "failed": result.failed,
+        "removed": result.removed,
+        "total": result.total,
+        "results": result.details,
+    }
