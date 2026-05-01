@@ -21,7 +21,9 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/fitness_db
-      CORS_ORIGINS: '*'
+      # Локальный безопасный набор: контейнер фронта (Nginx :3000) и Vite dev (:5173).
+      # В проде задайте CORS_ORIGINS через env с реальными доменами фронтенда (через запятую).
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
       FATSECRET_CLIENT_ID: ${FATSECRET_CLIENT_ID:-}
       FATSECRET_CLIENT_SECRET: ${FATSECRET_CLIENT_SECRET:-}
       FATSECRET_SCOPE: ${FATSECRET_SCOPE:-basic barcode}

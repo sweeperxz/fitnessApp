@@ -2,7 +2,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from datetime import date, timedelta, datetime, timezone
 import models, schemas
-from cache import get_cached_profile, set_cached_profile, invalidate_profile_cache
 
 SYNC_OP_ADD_MEAL = "nutrition.add_meal"
 SYNC_OP_LOG_WATER = "nutrition.log_water"
@@ -74,16 +73,8 @@ def count_admin_users(db: Session) -> int:
 
 # ── Profile ───────────────────────────────────────────────
 def get_profile(db: Session, user_id: int):
-    # Спочатку перевіряємо кеш
-    cached = get_cached_profile(user_id)
-    if cached:
-        return cached
+    return db.query(models.Profile).filter(models.Profile.user_id == user_id).first()
 
-    # Якщо немає в кеші, запитуємо з БД
-    profile = db.query(models.Profile).filter(models.Profile.user_id == user_id).first()
-    if profile:
-        set_cached_profile(user_id, profile)
-    return profile
 
 def upsert_profile(db: Session, user_id: int, data: schemas.ProfileCreate):
     p = db.query(models.Profile).filter(models.Profile.user_id == user_id).first()
@@ -95,11 +86,6 @@ def upsert_profile(db: Session, user_id: int, data: schemas.ProfileCreate):
         db.add(p)
     db.commit()
     db.refresh(p)
-
-    # Інвалідуємо кеш після оновлення
-    invalidate_profile_cache(user_id)
-    set_cached_profile(user_id, p)
-
     return p
 
 # ── Nutrition ─────────────────────────────────────────────
