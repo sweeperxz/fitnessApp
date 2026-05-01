@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { enqueue, setupAutoFlush } from '../utils/offlineQueue'
+import { enqueue, setupAutoFlush } from '../utils/offlineSync'
 import { errorHaptic } from '../utils/haptic'
 
 const api = axios.create({ baseURL: '/api' })

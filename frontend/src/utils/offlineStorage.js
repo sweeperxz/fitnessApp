@@ -1,15 +1,21 @@
-// Локальное хранилище для оффлайн режима
-const STORAGE_KEY = 'nutrio_offline_data'
-const PENDING_SYNC_KEY = 'nutrio_pending_sync'
+/**
+ * Локальный read-cache для оффлайн-режима.
+ *
+ * Назначение узкое: сохранять последний успешный ответ от GET-эндпоинтов,
+ * чтобы PWA в оффлайне могло отрисовать "что-то осмысленное" вместо
+ * пустой страницы. Это НЕ очередь записей — для записи смотри
+ * `utils/offlineSync.js`.
+ */
 
-// Сохранить данные локально
+const STORAGE_KEY = 'nutrio_offline_data'
+
 export function saveOfflineData(key, data) {
   try {
     const storage = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
     storage[key] = {
       data,
       timestamp: Date.now(),
-      synced: false
+      synced: false,
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(storage))
     return true
@@ -19,7 +25,6 @@ export function saveOfflineData(key, data) {
   }
 }
 
-// Получить локальные данные
 export function getOfflineData(key) {
   try {
     const storage = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
@@ -30,7 +35,6 @@ export function getOfflineData(key) {
   }
 }
 
-// Пометить данные как синхронизированные
 export function markAsSynced(key) {
   try {
     const storage = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
@@ -43,64 +47,9 @@ export function markAsSynced(key) {
   }
 }
 
-// Получить все несинхронизированные данные
-export function getUnsyncedData() {
-  try {
-    const storage = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
-    return Object.entries(storage)
-      .filter(([_, value]) => !value.synced)
-      .map(([key, value]) => ({ key, ...value }))
-  } catch (e) {
-    console.error('Failed to get unsynced data:', e)
-    return []
-  }
-}
-
-// Добавить операцию в очередь синхронизации
-export function addPendingSync(operation) {
-  try {
-    const pending = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || '[]')
-    pending.push({
-      ...operation,
-      id: Date.now() + Math.random(),
-      timestamp: Date.now()
-    })
-    localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(pending))
-    return true
-  } catch (e) {
-    console.error('Failed to add pending sync:', e)
-    return false
-  }
-}
-
-// Получить очередь синхронизации
-export function getPendingSync() {
-  try {
-    return JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || '[]')
-  } catch (e) {
-    console.error('Failed to get pending sync:', e)
-    return []
-  }
-}
-
-// Удалить операцию из очереди
-export function removePendingSync(id) {
-  try {
-    const pending = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || '[]')
-    const filtered = pending.filter(op => op.id !== id)
-    localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(filtered))
-    return true
-  } catch (e) {
-    console.error('Failed to remove pending sync:', e)
-    return false
-  }
-}
-
-// Очистить все локальные данные
 export function clearOfflineData() {
   try {
     localStorage.removeItem(STORAGE_KEY)
-    localStorage.removeItem(PENDING_SYNC_KEY)
     return true
   } catch (e) {
     console.error('Failed to clear offline data:', e)

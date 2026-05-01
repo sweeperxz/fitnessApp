@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/en'
 import 'dayjs/locale/uk'
 import { addMeal, deleteMeal, logWater } from '../api'
+import { AppLayoutContext } from '../components/AppShell'
 import { tapHaptic, successHaptic } from '../utils/haptic'
 import { MEAL_TYPES } from '../utils/constants'
 import './today/TodayPage.css'
@@ -18,8 +19,9 @@ import { useTodayData } from './today/hooks/useTodayData'
 import { useTodaySync } from './today/hooks/useTodaySync'
 import { useAiTips } from './today/hooks/useAiTips'
 
-export default function TodayPage({ onBlockingOverlayChange }) {
+export default function TodayPage() {
   const { t, i18n } = useTranslation()
+  const { setBlockingOverlay } = React.useContext(AppLayoutContext)
   const [day, setDay] = useState(dayjs())
   const [modalOpen, setModalOpen] = useState(false)
 
@@ -28,9 +30,9 @@ export default function TodayPage({ onBlockingOverlayChange }) {
   }, [i18n.language])
 
   useEffect(() => {
-    onBlockingOverlayChange?.(modalOpen)
-    return () => onBlockingOverlayChange?.(false)
-  }, [modalOpen, onBlockingOverlayChange])
+    setBlockingOverlay?.(modalOpen)
+    return () => setBlockingOverlay?.(false)
+  }, [modalOpen, setBlockingOverlay])
 
   const {
     data,

@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { upsertProfile } from '../api'
 import api from '../api'
+import { useAuthContext } from '../auth/AuthContext'
 import { useFormValidation } from '../hooks/useFormValidation'
 import { STEPS, getGenderOptions, getGoalOptions, getActivityOptions, PARAM_FIELDS } from './onboarding/constants'
 import OnboardingHeader from './onboarding/components/OnboardingHeader'
@@ -12,8 +14,10 @@ import OnboardingGoalStep from './onboarding/components/OnboardingGoalStep'
 import OnboardingActivityStep from './onboarding/components/OnboardingActivityStep'
 import OnboardingFinishStep from './onboarding/components/OnboardingFinishStep'
 
-export default function OnboardingPage({ onDone }) {
+export default function OnboardingPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+  const { markProfileComplete } = useAuthContext()
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(false)
   const [previewGoals, setPreviewGoals] = useState(null)
@@ -81,13 +85,14 @@ export default function OnboardingPage({ onDone }) {
         ...goals,
       })
 
-      onDone()
+      markProfileComplete()
+      navigate('/today', { replace: true })
     } catch (e) {
       console.error('Onboarding failed:', e)
       alert('Ошибка при сохранении профиля')
     }
     setLoading(false)
-  }, [data, onDone])
+  }, [data, markProfileComplete, navigate])
 
   return (
     <div className="onboard-wrap fade-in">
