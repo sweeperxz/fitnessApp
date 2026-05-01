@@ -20,7 +20,6 @@ class TokenResponse(BaseModel):
     email: str
     role: str = "user"
     has_profile: bool
-    csrf_token: Optional[str] = None
 
 class UserAdminResponse(BaseModel):
     id: int

@@ -1,5 +1,10 @@
 """
-Админ-роутер: управление пользователями. Все мутации требуют CSRF-токен.
+Админ-роутер: управление пользователями.
+
+Состояние-меняющие ручки защищены Bearer-токеном и проверкой роли admin
+(`get_admin_user`). Токен хранится в `localStorage` и отправляется вручную в `Authorization`,
+браузер не добавляет его в cross-origin запросы автоматически — поэтому CSRF здесь не нужен.
+Если в будущем переводим хранение в HttpOnly-cookie — нужно вернуть CSRF на все мутации.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -8,7 +13,6 @@ import crud
 import models
 import schemas
 from auth import get_admin_user, get_db
-from csrf import require_csrf, verify_csrf_token
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -36,11 +40,7 @@ def update_role(
     data: schemas.UserRoleUpdate,
     admin: models.User = Depends(get_admin_user),
     db: Session = Depends(get_db),
-    csrf_token: str = Depends(require_csrf),
 ):
-    if not verify_csrf_token(csrf_token, admin.id):
-        raise HTTPException(403, "Невалідний CSRF токен")
-
     if user_id == admin.id and data.role != "admin":
         raise HTTPException(400, "Нельзя снять роль администратора самому себе")
 
@@ -66,10 +66,7 @@ def delete_user(
     user_id: int,
     admin: models.User = Depends(get_admin_user),
     db: Session = Depends(get_db),
-    csrf_token: str = Depends(require_csrf),
 ):
-    if not verify_csrf_token(csrf_token, admin.id):
-        raise HTTPException(403, "Невалідний CSRF токен")
     if user_id == admin.id:
         raise HTTPException(400, "Нельзя удалить самого себя")
 

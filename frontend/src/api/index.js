@@ -4,12 +4,6 @@ import { errorHaptic } from '../utils/haptic'
 
 const api = axios.create({ baseURL: '/api' })
 
-export const getCsrfToken = () => localStorage.getItem('ff_csrf_token')
-export const setCsrfToken = (t) => {
-  if (t) localStorage.setItem('ff_csrf_token', t)
-}
-export const removeCsrfToken = () => localStorage.removeItem('ff_csrf_token')
-
 // Retry configuration
 const MAX_RETRIES = 3
 const RETRY_DELAY = 1000 // 1 секунда
@@ -21,7 +15,8 @@ export const setToken = (t) => localStorage.setItem('ff_token', t)
 export const removeToken = () => localStorage.removeItem('ff_token')
 export const clearAuthState = () => {
   removeToken()
-  removeCsrfToken()
+  // Списываем легаси-ключ от старого CSRF-механизма, если он остался в браузере.
+  localStorage.removeItem('ff_csrf_token')
 }
 
 api.interceptors.request.use(cfg => {
@@ -30,24 +25,13 @@ api.interceptors.request.use(cfg => {
   const t = getToken()
   if (t) cfg.headers.Authorization = `Bearer ${t}`
 
-  const method = (cfg.method || 'get').toLowerCase()
-  if (method !== 'get' && method !== 'head' && method !== 'options') {
-    const csrfToken = getCsrfToken()
-    if (csrfToken) cfg.headers['X-CSRF-Token'] = csrfToken
-  }
-
-  // Додаємо retry config якщо його немає
   if (!cfg.retryCount) cfg.retryCount = 0
 
   return cfg
 })
 
 api.interceptors.response.use(
-  r => {
-    const csrfToken = r?.data?.csrf_token
-    if (csrfToken) setCsrfToken(csrfToken)
-    return r
-  },
+  r => r,
   async err => {
     const config = err.config
 

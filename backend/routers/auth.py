@@ -18,7 +18,6 @@ from auth import (
     verify_password,
 )
 from config import settings
-from csrf import generate_csrf_token
 from rate_limit import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -141,7 +140,6 @@ def me(
     db: Session = Depends(get_db),
 ):
     profile = crud.get_profile(db, user.id)
-    csrf_token = generate_csrf_token(user.id)
     return schemas.TokenResponse(
         access_token="",
         user_id=user.id,
@@ -149,5 +147,4 @@ def me(
         email=user.email,
         role=user.role,
         has_profile=bool(profile and profile.goal),
-        csrf_token=csrf_token,
     )

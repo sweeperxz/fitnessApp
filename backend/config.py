@@ -44,8 +44,17 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> List[str]:
-        """Преобразует строку CORS_ORIGINS в список"""
-        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+        """Преобразует строку CORS_ORIGINS в список доменов."""
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def cors_allow_credentials(self) -> bool:
+        """
+        Браузеры запрещают `Access-Control-Allow-Credentials: true` вместе
+        с `Access-Control-Allow-Origin: *`. Чтобы не получать молчаливо
+        ломающийся CORS — если в `CORS_ORIGINS` стоит `*`, кредитналы выключаем.
+        """
+        return "*" not in self.cors_origins_list
 
     def model_post_init(self, __context):
         """Валідація після ініціалізації"""

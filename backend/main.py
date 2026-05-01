@@ -38,10 +38,15 @@ app = FastAPI(title="Nutrio API", version="2.1.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+if "*" in settings.cors_origins_list:
+    logger.warning(
+        "CORS_ORIGINS contains '*' — credentials disabled, set explicit domains in production."
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
+    allow_credentials=settings.cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
