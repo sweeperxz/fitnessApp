@@ -1,0 +1,14 @@
+# Ruff configuration for the Nutrio backend.
+#
+# Цель — поймать настоящие ошибки (синтаксис, неиспользуемые импорты, undefined
+# names) без навязывания тяжёлого стиля на легаси-коде. Если позже захотим
+# построже — расширим набор правил постепенно (в первую очередь I/UP/B).
+
+line-length = 120
+target-version = "py312"
+
+[lint]
+select = [
+    "F",    # pyflakes (unused imports, undefined names, redefined names и т.д.)
+    "E9",   # syntax errors
+]
