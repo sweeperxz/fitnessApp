@@ -1,6 +1,19 @@
 import React from 'react'
 
-export default function ProfileGoalsCard({ form, goals, acts, calculating, onUpdate, onSelectGoal, onSelectActivity, onRecalculate, t }) {
+export default function ProfileGoalsCard({
+  form,
+  goals,
+  acts,
+  genders,
+  calculating,
+  canCalculate,
+  onUpdate,
+  onSelectGoal,
+  onSelectActivity,
+  onSelectGender,
+  onRecalculate,
+  t,
+}) {
   return (
     <div className="card">
       <div className="card-label">{t('profile.main_data')}</div>
@@ -17,6 +30,52 @@ export default function ProfileGoalsCard({ form, goals, acts, calculating, onUpd
           onChange={e => onUpdate('weight', e.target.value)}
         />
       </div>
+
+      <div className="form-group">
+        <div className="input-label">{t('onboarding.steps.params.height')}</div>
+        <input
+          className="input"
+          type="number"
+          inputMode="numeric"
+          min="0"
+          step="1"
+          value={form.height}
+          onChange={e => onUpdate('height', e.target.value)}
+          placeholder="—"
+        />
+      </div>
+
+      <div className="form-group">
+        <div className="input-label">{t('onboarding.steps.params.age')}</div>
+        <input
+          className="input"
+          type="number"
+          inputMode="numeric"
+          min="0"
+          step="1"
+          value={form.age}
+          onChange={e => onUpdate('age', e.target.value)}
+          placeholder="—"
+        />
+      </div>
+
+      {genders && (
+        <div className="form-group">
+          <div className="input-label">{t('onboarding.steps.gender.title')}</div>
+          <div className="chip-row">
+            {genders.map(g => (
+              <button
+                key={g.v}
+                type="button"
+                onClick={() => onSelectGender?.(g.v)}
+                className={`chip${form.gender === g.v ? ' active' : ''}`}
+              >
+                {t(g.lKey)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="form-group">
         <div className="input-label">{t('profile.goal')}</div>
@@ -53,8 +112,9 @@ export default function ProfileGoalsCard({ form, goals, acts, calculating, onUpd
       <button
         type="button"
         onClick={onRecalculate}
-        disabled={calculating}
+        disabled={calculating || canCalculate === false}
         className="profile-recalc-btn"
+        title={canCalculate === false ? (t('profile.recalc_missing_data') || 'Заполните рост, возраст и пол') : undefined}
       >
         {calculating ? t('common.loading') || 'Расчет...' : t('profile.recalculate')}
       </button>

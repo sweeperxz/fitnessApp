@@ -133,7 +133,9 @@
         "fatsecret_region_ie": "Ірландія",
         "fatsecret_region_in": "Індія",
         "fatsecret_region_sg": "Сінгапур",
-        "fatsecret_region_za": "Південна Африка"
+        "fatsecret_region_za": "Південна Африка",
+        "recalc_missing_data": "Заповніть зріст, вік і стать перед розрахунком",
+        "recalc_error": "Не вдалося розрахувати цілі"
     },
     "goals": {
         "lose": "Схуднення",

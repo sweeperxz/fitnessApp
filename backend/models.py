@@ -28,6 +28,13 @@ class Profile(Base):
     id                = Column(Integer, primary_key=True)
     user_id           = Column(Integer, ForeignKey("users.id"), unique=True, index=True)
     weight            = Column(Float, default=70)
+    # height/age/gender нужны для пересчёта целей на ProfilePage; раньше
+    # хардкодились (175см/30/male) — это вычислялось правильно только
+    # для онбординга. Nullable — чтобы старые профили (до миграции 0008)
+    # не разваливались до того, как юзер откроет редактор и сохранит.
+    height            = Column(Float, nullable=True)
+    age               = Column(Integer, nullable=True)
+    gender            = Column(String, nullable=True)
     goal              = Column(String, default="")
     activity          = Column(String, default="medium")
     water_goal        = Column(Integer, default=2500)
