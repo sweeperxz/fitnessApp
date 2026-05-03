@@ -18,12 +18,29 @@ import ProfileAboutCard from './profile/components/ProfileAboutCard'
 
 const GOALS = [{ v: 'lose', lKey: 'goals.lose' }, { v: 'maintain', lKey: 'goals.maintain' }, { v: 'gain', lKey: 'goals.gain' }]
 const ACTS = [{ v: 'low', lKey: 'activity.low' }, { v: 'medium', lKey: 'activity.medium' }, { v: 'high', lKey: 'activity.high' }]
+const GENDERS = [{ v: 'male', lKey: 'onboarding.steps.gender.male' }, { v: 'female', lKey: 'onboarding.steps.gender.female' }]
 
 export default function ProfilePage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { signOut } = useAuthContext()
-  const [form, setForm] = useState({ weight: 70, goal: 'maintain', activity: 'medium', water_goal: 2500, calories_goal: 2000, protein_goal: 150, fat_goal: 70, carbs_goal: 250, fatsecret_region: 'default' })
+  const [form, setForm] = useState({
+    weight: 70,
+    // height/age/gender — пустые по умолчанию (NULL в БД для старых юзеров).
+    // Юзер заполнит при первом редактировании; пока пустые — кнопка
+    // «Рассчитать» заблокирована.
+    height: '',
+    age: '',
+    gender: '',
+    goal: 'maintain',
+    activity: 'medium',
+    water_goal: 2500,
+    calories_goal: 2000,
+    protein_goal: 150,
+    fat_goal: 70,
+    carbs_goal: 250,
+    fatsecret_region: 'default',
+  })
   const [user, setUser] = useState(null)
   const [tab, setTab] = useState('goals')
   const [saved, setSaved] = useState(false)
@@ -39,7 +56,17 @@ export default function ProfilePage() {
 
   useEffect(() => {
     getMe().then(u => setUser(u)).catch(() => { })
-    getProfile().then(p => setForm(f => ({ ...f, ...p }))).catch(() => { })
+    getProfile().then(p => {
+      // null из БД (height/age/gender у юзеров до миграции 0008) превращаем
+      // в '' — иначе controlled-инпуты в React будут жаловаться на change-from-uncontrolled.
+      setForm(f => ({
+        ...f,
+        ...p,
+        height: p.height ?? '',
+        age: p.age ?? '',
+        gender: p.gender ?? '',
+      }))
+    }).catch(() => { })
   }, [])
 
   const handlePushToggle = async () => {
@@ -74,21 +101,32 @@ export default function ProfilePage() {
   }
 
   const upd = (k, v) => {
-    if (['weight', 'water_goal', 'calories_goal', 'protein_goal', 'fat_goal', 'carbs_goal'].includes(k)) {
-      const numVal = parseFloat(v)
-      if (numVal < 0 || isNaN(numVal)) return
+    // height/age — числовые поля, но допускаем '' (пустую строку), чтобы
+    // юзер мог стереть значение и ввести заново. weight/age/height валидируем
+    // только когда там не пусто.
+    if (['weight', 'water_goal', 'calories_goal', 'protein_goal', 'fat_goal', 'carbs_goal', 'height', 'age'].includes(k)) {
+      if (v !== '') {
+        const numVal = parseFloat(v)
+        if (numVal < 0 || isNaN(numVal)) return
+      }
     }
     setForm(f => ({ ...f, [k]: v }))
   }
 
+  const canCalculate = form.height !== '' && form.age !== '' && !!form.gender
+
   const handleCalculateGoals = async () => {
+    if (!canCalculate) {
+      alert(t('profile.recalc_missing_data') || 'Заполните рост, возраст и пол перед расчётом')
+      return
+    }
     setCalculating(true)
     try {
       const { data } = await api.post('/profile/calculate-goals', {
-        weight: form.weight,
-        height: 175,
-        age: 30,
-        gender: 'male',
+        weight: +form.weight,
+        height: +form.height,
+        age: +form.age,
+        gender: form.gender,
         goal: form.goal,
         activity: form.activity,
       })
@@ -96,14 +134,22 @@ export default function ProfilePage() {
       successHaptic()
     } catch (err) {
       console.error('Calculation failed:', err)
-      alert('Ошибка расчета целей')
+      alert(t('profile.recalc_error') || 'Ошибка расчета целей')
     } finally {
       setCalculating(false)
     }
   }
 
   const save = async () => {
-    await upsertProfile(form)
+    // height/age/gender — Optional на бэке, но pydantic отвергнет '' при попытке
+    // коэрсии в float/int. Поэтому пустые поля сериализуем как null.
+    const payload = {
+      ...form,
+      height: form.height === '' ? null : +form.height,
+      age: form.age === '' ? null : +form.age,
+      gender: form.gender || null,
+    }
+    await upsertProfile(payload)
     successHaptic()
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -122,6 +168,11 @@ export default function ProfilePage() {
   const handleActivitySelect = (activity) => {
     tapHaptic()
     upd('activity', activity)
+  }
+
+  const handleGenderSelect = (gender) => {
+    tapHaptic()
+    upd('gender', gender)
   }
 
   const handleThemeToggle = () => {
@@ -156,10 +207,13 @@ export default function ProfilePage() {
             form={form}
             goals={GOALS}
             acts={ACTS}
+            genders={GENDERS}
             calculating={calculating}
+            canCalculate={canCalculate}
             onUpdate={upd}
             onSelectGoal={handleGoalSelect}
             onSelectActivity={handleActivitySelect}
+            onSelectGender={handleGenderSelect}
             onRecalculate={handleCalculateGoals}
             t={t}
           />

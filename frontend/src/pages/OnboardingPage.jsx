@@ -78,8 +78,13 @@ export default function OnboardingPage() {
         activity: data.activity,
       })
 
+      // height/age/gender теперь сохраняются в профиле, чтобы пересчёт
+      // целей на ProfilePage использовал реальные данные, а не хардкод.
       await upsertProfile({
         weight: +data.weight,
+        height: +data.height,
+        age: +data.age,
+        gender: data.gender,
         goal: data.goal,
         activity: data.activity,
         ...goals,

@@ -133,7 +133,9 @@
         "fatsecret_region_ie": "Ireland",
         "fatsecret_region_in": "India",
         "fatsecret_region_sg": "Singapore",
-        "fatsecret_region_za": "South Africa"
+        "fatsecret_region_za": "South Africa",
+        "recalc_missing_data": "Fill in height, age and gender first",
+        "recalc_error": "Failed to calculate goals"
     },
     "goals": {
         "lose": "Weight Loss",

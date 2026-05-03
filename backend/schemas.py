@@ -35,6 +35,11 @@ class UserRoleUpdate(BaseModel):
 # ── Profile ───────────────────────────────────────────────
 class ProfileCreate(BaseModel):
     weight: float = Field(..., gt=0, le=500, description="Вес в кг")
+    # height/age/gender — необязательные, чтобы не сломать существующих юзеров
+    # без миграции данных. После открытия редактора они будут заполняться.
+    height: Optional[float] = Field(default=None, gt=0, le=300, description="Рост в см")
+    age: Optional[int] = Field(default=None, gt=0, le=120, description="Возраст в годах")
+    gender: Optional[str] = Field(default=None, pattern="^(male|female)$", description="Пол")
     goal: str = Field(..., pattern="^(lose|maintain|gain)$", description="Цель: lose, maintain, gain")
     activity: str = Field(..., pattern="^(low|medium|high)$", description="Активность: low, medium, high")
     water_goal: int = Field(..., ge=0, le=20000, description="Цель по воде в мл")
