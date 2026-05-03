@@ -6,6 +6,7 @@ import 'dayjs/locale/uk'
 import { addMeal, deleteMeal, logWater } from '../api'
 import { AppLayoutContext } from '../components/AppShell'
 import { tapHaptic, successHaptic } from '../utils/haptic'
+import { validateWaterIntake } from '../utils/waterValidation'
 import { MEAL_TYPES } from '../utils/constants'
 import './today/TodayPage.css'
 import TodayHeader from './today/components/TodayHeader'
@@ -93,6 +94,16 @@ export default function TodayPage() {
   const addWaterWithValidation = useCallback(async (ml) => {
     tapHaptic()
 
+    // Клиентская валидация (B9): без неё в оффлайне записи c превышением лимита
+    // улетали в очередь, проигрывались онлайн, бэк отвечал 4xx → запись
+    // тихо отбрасывалась, но в UI юзер уже видел +Nмл воды. Теперь блокируем
+    // одинаково в обоих режимах.
+    const check = validateWaterIntake(d.water_ml, ml, t)
+    if (!check.valid) {
+      alert(check.message)
+      return
+    }
+
     if (isOffline) {
       queueWaterOffline(ml)
       successHaptic()
@@ -122,7 +133,7 @@ export default function TodayPage() {
         alert(fallbackMessage)
       }
     }
-  }, [day, isOffline, load, queueWaterOffline, t])
+  }, [d.water_ml, day, isOffline, load, queueWaterOffline, t])
 
   const handleDeleteMeal = useCallback((mealId) => {
     deleteMeal(mealId).then(load)

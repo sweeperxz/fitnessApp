@@ -17,7 +17,8 @@
         "offline_toast": "No network · saved locally",
         "offline_toast_desc": "No internet connection",
         "syncing": "Syncing...",
-        "synced_toast": "Synced ✓"
+        "synced_toast": "Synced ✓",
+        "rejected_toast": "Some changes rejected by server"
     },
     "nav": {
         "nutrition": "Nutrition",
