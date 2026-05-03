@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
@@ -37,7 +37,8 @@ def validate_password_strength(password: str) -> tuple[bool, str]:
     return True, ""
 
 def create_token(user_id: int) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    # timezone-aware UTC; datetime.utcnow() deprecated в 3.12+ и эмитит warning.
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return jwt.encode({"sub": str(user_id), "exp": expire}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 def get_current_user(

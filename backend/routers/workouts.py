@@ -53,5 +53,6 @@ def delete_workout(
     user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    crud.delete_workout(db, workout_id, user.id)
+    if not crud.delete_workout(db, workout_id, user.id):
+        raise HTTPException(404, "Workout not found")
     return {"ok": True}

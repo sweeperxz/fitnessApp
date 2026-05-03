@@ -1,15 +1,15 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 from datetime import date, datetime
 from typing import Optional, List
 
 # ── Auth ──────────────────────────────────────────────────
 class RegisterRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str
     name: str = ""
 
 class LoginRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str
 
 class TokenResponse(BaseModel):
@@ -17,13 +17,13 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user_id: int
     name: str
-    email: str
+    email: EmailStr
     role: str = "user"
     has_profile: bool
 
 class UserAdminResponse(BaseModel):
     id: int
-    email: str
+    email: EmailStr
     name: str
     role: str
     created_at: datetime

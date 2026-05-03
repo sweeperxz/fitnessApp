@@ -4,7 +4,7 @@
 Push-уведомления при достижении цели запускаются через BackgroundTasks,
 чтобы не блокировать HTTP-ответ webpush()-запросом.
 """
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -19,6 +19,10 @@ from services.push_service import send_push_notification
 MAX_SINGLE_WATER_INTAKE_ML = 2000
 MAX_DAILY_WATER_ML = 10000
 
+# Окно доступной истории. timedelta — а не today.replace(year=year-1) —
+# чтобы не падать 29 февраля високосного года: в прошлом году такого числа нет.
+NUTRITION_HISTORY_WINDOW = timedelta(days=365)
+
 router = APIRouter(prefix="/nutrition", tags=["nutrition"])
 
 
@@ -29,11 +33,11 @@ def get_nutrition(
     db: Session = Depends(get_db),
 ):
     today = date.today()
-    one_year_ago = today.replace(year=today.year - 1)
+    earliest_allowed = today - NUTRITION_HISTORY_WINDOW
 
     if day > today:
         raise HTTPException(400, "Неможливо отримати дані для майбутньої дати")
-    if day < one_year_ago:
+    if day < earliest_allowed:
         raise HTTPException(400, "Дані доступні тільки за останній рік")
 
     return crud.get_nutrition_day(db, user.id, day)
@@ -91,7 +95,8 @@ def delete_meal(
     user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    crud.delete_meal(db, meal_id, user.id)
+    if not crud.delete_meal(db, meal_id, user.id):
+        raise HTTPException(404, "Meal not found")
     return {"ok": True}
 
 
