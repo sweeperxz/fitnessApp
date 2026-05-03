@@ -6,7 +6,7 @@
 браузер не добавляет его в cross-origin запросы автоматически — поэтому CSRF здесь не нужен.
 Если в будущем переводим хранение в HttpOnly-cookie — нужно вернуть CSRF на все мутации.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 import crud
@@ -21,10 +21,9 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 def get_all_users(
     admin: models.User = Depends(get_admin_user),
     db: Session = Depends(get_db),
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
 ):
-    limit = min(limit, 100)
     return (
         db.query(models.User)
         .order_by(models.User.id.desc())

@@ -1,8 +1,6 @@
 """
 Поиск и история продуктов: интеграция с FatSecret + локальная история.
 """
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
@@ -10,6 +8,7 @@ import crud
 import models
 import schemas
 from auth import get_current_user, get_db
+from models import utcnow
 from rate_limit import limiter
 from services import fatsecret_service
 
@@ -67,7 +66,7 @@ def get_recent_foods(
     )
 
 
-@router.post("/recent")
+@router.post("/recent", response_model=schemas.FoodItemResponse)
 def add_recent_food(
     data: schemas.FoodItemCreate,
     user: models.User = Depends(get_current_user),
@@ -80,19 +79,20 @@ def add_recent_food(
     )
 
     if existing:
-        existing.last_used = datetime.utcnow()
+        existing.last_used = utcnow()
+        record = existing
     else:
-        db.add(
-            models.UserFood(
-                user_id=user.id,
-                name=data.name,
-                brand=data.brand,
-                calories=data.calories,
-                protein=data.protein,
-                fat=data.fat,
-                carbs=data.carbs,
-            )
+        record = models.UserFood(
+            user_id=user.id,
+            name=data.name,
+            brand=data.brand,
+            calories=data.calories,
+            protein=data.protein,
+            fat=data.fat,
+            carbs=data.carbs,
         )
+        db.add(record)
 
     db.commit()
-    return {"ok": True}
+    db.refresh(record)
+    return record

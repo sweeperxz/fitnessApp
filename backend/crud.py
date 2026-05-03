@@ -159,7 +159,8 @@ def add_meal(db: Session, user_id: int, data: schemas.MealCreate):
     db.refresh(meal)
     return meal
 
-def delete_meal(db: Session, meal_id: int, user_id: int):
+def delete_meal(db: Session, meal_id: int, user_id: int) -> bool:
+    """Удалить приём пищи. Возвращает True если что-то удалено, иначе False."""
     meal = db.query(models.Meal).filter(
         models.Meal.id == meal_id,
         models.Meal.user_id == user_id
@@ -167,6 +168,8 @@ def delete_meal(db: Session, meal_id: int, user_id: int):
     if meal:
         db.delete(meal)
         db.commit()
+        return True
+    return False
 
 def log_water(db: Session, user_id: int, data: schemas.WaterLogCreate):
     water_data = data.model_dump(exclude={'op_id'})
@@ -258,7 +261,8 @@ def add_exercise(db: Session, workout_id: int, user_id: int, data: schemas.Exerc
     db.refresh(ex)
     return ex
 
-def delete_workout(db: Session, workout_id: int, user_id: int):
+def delete_workout(db: Session, workout_id: int, user_id: int) -> bool:
+    """Удалить тренировку. Возвращает True если что-то удалено, иначе False."""
     w = db.query(models.Workout).filter(
         models.Workout.id == workout_id,
         models.Workout.user_id == user_id
@@ -266,6 +270,8 @@ def delete_workout(db: Session, workout_id: int, user_id: int):
     if w:
         db.delete(w)
         db.commit()
+        return True
+    return False
 
 # ── Stats ─────────────────────────────────────────────────
 def get_stats(db: Session, user_id: int, days: int = 30) -> schemas.Stats:

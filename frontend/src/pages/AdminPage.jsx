@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getAdminUsers, updateAdminUserRole, deleteAdminUser, getMe } from '../api'
+import { getAdminUsers, updateAdminUserRole, deleteAdminUser } from '../api'
+import { useAuthContext } from '../auth/AuthContext'
 import { mediumHaptic, successHaptic, errorHaptic } from '../utils/haptic'
 import AdminHeader from './admin/components/AdminHeader'
 import AdminStateView from './admin/components/AdminStateView'
@@ -9,16 +10,17 @@ import AdminUserCard from './admin/components/AdminUserCard'
 
 export default function AdminPage() {
   const { t } = useTranslation()
+  const { user } = useAuthContext()
+  // user_id уже есть в AuthContext — не делаем лишний getMe() round-trip.
+  const myId = user?.user_id ?? null
   const [users, setUsers] = useState([])
-  const [myId, setMyId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState('')
 
   const loadData = async () => {
     try {
-      const [me, allUsers] = await Promise.all([getMe(), getAdminUsers()])
-      setMyId(me.user_id)
+      const allUsers = await getAdminUsers()
       setUsers(allUsers)
       setError('')
     } catch (err) {
