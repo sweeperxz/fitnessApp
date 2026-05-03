@@ -167,6 +167,9 @@ class PushSubscriptionCreate(BaseModel):
     p256dh: str
     auth: str
 
+class PushSubscriptionDelete(BaseModel):
+    endpoint: str
+
 class PushSubscriptionResponse(PushSubscriptionCreate):
     id: int
     user_id: int

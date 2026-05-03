@@ -35,6 +35,25 @@ def subscribe(
     return {"ok": True}
 
 
+@router.delete("/subscribe")
+def unsubscribe(
+    data: schemas.PushSubscriptionDelete,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Явный отказ от уведомлений. Фронт должен вызывать после
+    `subscription.unsubscribe()` в браузере, чтобы строка в БД сразу
+    удалялась, а не висела до первой неудачной попытки отправки.
+
+    Возвращаем 200 в обоих случаях (нашли/не нашли) — клиенту фактически
+    важно "после этого вызова сабскрипшен в БД отсутствует". 404 здесь
+    больше создаст путаницы (race condition: кто-то уже почистил по 410).
+    """
+    removed = crud.delete_push_subscription(db, user.id, data.endpoint)
+    return {"ok": True, "removed": removed}
+
+
 @router.post("/test")
 def test_push(
     user: models.User = Depends(get_current_user),
