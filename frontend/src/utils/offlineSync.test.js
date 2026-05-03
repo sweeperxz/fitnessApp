@@ -9,6 +9,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const STORAGE_KEY = 'nutrio_write_queue'
 
+// Чистим localStorage между тестами, иначе очередь из одного теста
+// "просачивается" в следующий и тесты на стартовый flush видят чужую запись.
+beforeEach(() => {
+  localStorage.clear()
+})
+
 // Лениво подгружаем свежий модуль после resetModules — иначе модульный
 // флаг `migrated` остаётся true с прошлого теста.
 async function freshModule() {
@@ -265,6 +271,55 @@ describe('flush', () => {
     const axios = makeMockAxios([])
     const result = await flush(axios)
     expect(result.synced).toBe(0)
+    expect(axios.calls).toHaveLength(0)
+  })
+})
+
+// ── setupAutoFlush ──────────────────────────────────────────
+// B7: на старте, если очередь не пуста и навигатор онлайн — flush
+// должен запуститься без необходимости в offline→online toggle.
+describe('setupAutoFlush startup flush (B7)', () => {
+  beforeEach(() => {
+    // jsdom по умолчанию навигатор онлайн.
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+  })
+
+  it('flushes pending queue on init when navigator is online', async () => {
+    const { enqueue, setupAutoFlush, getQueueSize } = await freshModule()
+    enqueue('post', '/nutrition/meal', { day: '2025-01-01', name: 'A', calories: 100 })
+
+    const axios = makeMockAxios([
+      () => ({ data: { ok: true } }),
+    ])
+
+    setupAutoFlush(axios)
+    // Стартовый flush уходит в micro-task; ждём её завершения.
+    await new Promise(r => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
+
+    expect(axios.calls).toHaveLength(1)
+    expect(getQueueSize()).toBe(0)
+  })
+
+  it('does NOT flush on init when offline', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    const { enqueue, setupAutoFlush, getQueueSize } = await freshModule()
+    enqueue('post', '/nutrition/meal', { day: '2025-01-01', name: 'A', calories: 100 })
+
+    const axios = makeMockAxios([])
+    setupAutoFlush(axios)
+    await new Promise(r => setTimeout(r, 0))
+
+    expect(axios.calls).toHaveLength(0)
+    expect(getQueueSize()).toBe(1)
+  })
+
+  it('does NOT flush on init when queue is empty', async () => {
+    const { setupAutoFlush } = await freshModule()
+    const axios = makeMockAxios([])
+    setupAutoFlush(axios)
+    await new Promise(r => setTimeout(r, 0))
+
     expect(axios.calls).toHaveLength(0)
   })
 })

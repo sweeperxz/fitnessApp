@@ -212,18 +212,35 @@ export async function flush(axiosInstance) {
 
 let autoFlushSetup = false
 
+async function tryFlush(axiosInstance, onSynced) {
+  const result = await flush(axiosInstance)
+  if (result.synced > 0 || result.rejected > 0) {
+    onSynced?.(result)
+  }
+}
+
 /**
  * Подписаться на возврат онлайна и запускать flush. Вызывается один раз
  * при инициализации API-клиента.
+ *
+ * Дополнительно: если на момент инициализации в очереди уже что-то лежит
+ * и навигатор онлайн — сразу запускаем flush. Это покрывает сценарий B7:
+ * юзер залогировал воду в оффлайне, закрыл вкладку, в следующий раз
+ * открыл уже онлайн — событие `online` не срабатывает (оно бывает только
+ * при переходе offline→online), и записи висели в очереди до следующего
+ * случайного toggle сети. Теперь сливаются на старте.
  */
 export function setupAutoFlush(axiosInstance, onSynced) {
   if (autoFlushSetup) return
   autoFlushSetup = true
 
-  window.addEventListener('online', async () => {
-    const result = await flush(axiosInstance)
-    if (result.synced > 0 || result.rejected > 0) {
-      onSynced?.(result)
+  window.addEventListener('online', () => tryFlush(axiosInstance, onSynced))
+
+  // Стартовый flush. Делаем через micro-task, чтобы не блокировать импорт
+  // и дать другим частям API настроить interceptors.
+  if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+    if (getQueueSize() > 0) {
+      Promise.resolve().then(() => tryFlush(axiosInstance, onSynced))
     }
-  })
+  }
 }

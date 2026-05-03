@@ -27,11 +27,14 @@ const OfflineToast = React.memo(function OfflineToast() {
         // When we go offline
         const handleOffline = () => show(t('common.offline_toast_desc'), 'offline', 4000)
 
-        // When synced (dispatched from api/index.js and today sync)
+        // When synced (dispatched from api/index.js and today sync).
+        // B12: rejected (4xx из бэка) — отдельный осмысленный текст, а не
+        // "Error (1)". Юзер должен понимать, что часть его оффлайн-записей
+        // не дошла до сервера и была отброшена.
         const handleSynced = (e) => {
             const { synced = 0, rejected = 0 } = e.detail || {}
             if (synced > 0 && rejected > 0) {
-                show(`${t('common.synced_toast')} (${synced}), ${t('common.error')} (${rejected})`, 'synced', 3000)
+                show(`${t('common.synced_toast')} (${synced}) · ${t('common.rejected_toast')} (${rejected})`, 'offline', 4000)
                 return
             }
             if (synced > 0) {
@@ -39,7 +42,7 @@ const OfflineToast = React.memo(function OfflineToast() {
                 return
             }
             if (rejected > 0) {
-                show(`${t('common.error')} (${rejected})`, 'offline', 3000)
+                show(`${t('common.rejected_toast')} (${rejected})`, 'offline', 4000)
             }
         }
 
