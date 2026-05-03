@@ -41,8 +41,19 @@ export async function subscribeUser(publicVapidKey) {
 
 export async function unsubscribeUser() {
     const subscription = await getSubscription();
-    if (subscription) {
-        await subscription.unsubscribe();
-        // Optionially notify backend to remove subscription
+    if (!subscription) return;
+
+    const endpoint = subscription.endpoint;
+    await subscription.unsubscribe();
+
+    // Сообщаем бэку, чтобы он удалил соответствующую строку из БД
+    // здесь и сейчас — иначе она висела бы до первой попытки отправки,
+    // ленивой чистки 404/410 в push_service. (B6)
+    try {
+        await api.delete('/push/subscribe', { data: { endpoint } });
+    } catch (e) {
+        // Если бэк недоступен — невелика беда: send-обработчик в любом
+        // случае подчистит подписку при следующем сбое доставки.
+        console.warn('push unsubscribe backend call failed', e);
     }
 }

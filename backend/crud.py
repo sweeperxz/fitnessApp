@@ -368,6 +368,31 @@ def subscribe_push(db: Session, user_id: int, data: schemas.PushSubscriptionCrea
 def get_push_subscriptions(db: Session, user_id: int):
     return db.query(models.PushSubscription).filter(models.PushSubscription.user_id == user_id).all()
 
+
+def delete_push_subscription(db: Session, user_id: int, endpoint: str) -> bool:
+    """
+    Удалить подписку конкретного юзера по endpoint. Возвращает True, если
+    запись была удалена.
+
+    Дополнительно к ленивой чистке "мёртвых" эндпоинтов в send_push_*
+    (404/410), этот хук вызывается фронтом при явном отказе от уведомлений
+    (`unsubscribeUser`) — иначе строка в БД продолжала висеть до первой
+    попытки отправки и съедала cycle при батч-рассылке.
+    """
+    sub = (
+        db.query(models.PushSubscription)
+        .filter(
+            models.PushSubscription.user_id == user_id,
+            models.PushSubscription.endpoint == endpoint,
+        )
+        .first()
+    )
+    if not sub:
+        return False
+    db.delete(sub)
+    db.commit()
+    return True
+
 def check_goal_reached(db: Session, user_id: int, day: date, goal_type: str) -> tuple[bool, float, float]:
     """
     Перевіряє чи досягнута ціль. Повертає (was_reached_before, value_before, value_after).
