@@ -84,9 +84,19 @@ describe('enqueue', () => {
     expect(entry.data.op_id).toBe('fixed-id')
   })
 
-  it('does not inject op_id for non-nutrition endpoints', async () => {
+  it('auto-injects op_id for POST /workouts when missing', async () => {
+    // /workouts now uses the same SyncOperation machinery as /nutrition/*
+    // so an offline replay can't double-create the workout.
     const { enqueue } = await freshModule()
-    enqueue('post', '/workouts', { day: '2025-01-01' })
+    enqueue('post', '/workouts', { day: '2025-01-01', title: 'Push' })
+    const [entry] = readQueue()
+    expect(typeof entry.data.op_id).toBe('string')
+    expect(entry.data.op_id.length).toBeGreaterThan(0)
+  })
+
+  it('does not inject op_id for unrelated endpoints', async () => {
+    const { enqueue } = await freshModule()
+    enqueue('post', '/admin/users/42/role', { role: 'admin' })
     const [entry] = readQueue()
     expect(entry.data.op_id).toBeUndefined()
   })

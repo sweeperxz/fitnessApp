@@ -37,9 +37,14 @@ function generateOpId() {
 function ensureOpId(url, data) {
   if (!data || typeof data !== 'object') return data
   // op_id осмыслен только для эндпоинтов, у которых бэк его читает.
-  // /nutrition/meal и /nutrition/water — основные кандидаты.
+  // /nutrition/meal, /nutrition/water и POST /workouts используют общий
+  // SyncOperation-механизм для дедупликации повторных оффлайн-replay'ев.
   if (data.op_id) return data
-  if (url.startsWith('/nutrition/meal') || url.startsWith('/nutrition/water')) {
+  if (
+    url.startsWith('/nutrition/meal') ||
+    url.startsWith('/nutrition/water') ||
+    url === '/workouts'
+  ) {
     return { ...data, op_id: generateOpId() }
   }
   return data

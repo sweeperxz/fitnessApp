@@ -119,13 +119,24 @@ class Exercise(ExerciseCreate):
 
 class WorkoutCreate(BaseModel):
     day: date
-    title: str = "Тренировка"
-    notes: str = ""
+    title: str = Field(default="Тренировка", min_length=1, max_length=200)
+    notes: str = Field(default="", max_length=2000)
     exercises: Optional[List[ExerciseCreate]] = None
+    # op_id используется для дедупликации при оффлайн-replay'е (см.
+    # crud.create_workout). До этого PR'а workout мог попасть в БД дважды,
+    # если очередь оффлайн-записи переотправляла тот же запрос после того,
+    # как сервер уже принял первый.
+    op_id: Optional[str] = None
 
-class Workout(WorkoutCreate):
+class Workout(BaseModel):
+    # Раньше Workout наследовал WorkoutCreate. С добавлением op_id в Create
+    # это утянуло бы op_id в ответ — а это поле служебное, не для UI.
+    # Поэтому Workout явно перечисляет свои поля.
     id: int
     user_id: int
+    day: date
+    title: str
+    notes: str = ""
     created_at: datetime
     exercises: List[Exercise] = []
     class Config: from_attributes = True
