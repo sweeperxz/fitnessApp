@@ -1,6 +1,8 @@
 import axios from 'axios'
 import { enqueue, setupAutoFlush } from '../utils/offlineSync'
 import { errorHaptic } from '../utils/haptic'
+import { clearApiResponseCache } from '../utils/swCache'
+import { clearOfflineData } from '../utils/offlineStorage'
 
 const api = axios.create({ baseURL: '/api' })
 
@@ -10,6 +12,12 @@ const RETRY_DELAY = 1000 // 1 секунда
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
+// Событие для AuthContext: токен оказался недействителен (401) или юзер
+// явно вышел. Слушатель чистит React-стейт и редиректит на /auth через
+// React Router — без `window.location.reload()`, который раньше убивал
+// весь in-flight UI-стейт и ломался на оффлайн-мокнутых 401.
+export const AUTH_EXPIRED_EVENT = 'nutrio:auth-expired'
+
 export const getToken = () => localStorage.getItem('ff_token')
 export const setToken = (t) => localStorage.setItem('ff_token', t)
 export const removeToken = () => localStorage.removeItem('ff_token')
@@ -17,6 +25,12 @@ export const clearAuthState = () => {
   removeToken()
   // Списываем легаси-ключ от старого CSRF-механизма, если он остался в браузере.
   localStorage.removeItem('ff_csrf_token')
+  // SW-кеш с приватными API-ответами + локальный read-cache: всё это
+  // принадлежит конкретному юзеру; на logout вычищаем, чтобы в shared-
+  // браузере следующий юзер не увидел чужие данные в оффлайне.
+  // `clearApiResponseCache` async — fire-and-forget, не блокируем UI.
+  clearApiResponseCache()
+  clearOfflineData()
 }
 
 api.interceptors.request.use(cfg => {
@@ -35,10 +49,14 @@ api.interceptors.response.use(
   async err => {
     const config = err.config
 
-    // Auth error — logout
+    // Auth error — soft-logout. Раньше тут был `window.location.reload()`,
+    // что убивало любой in-flight UI-стейт (модалки, формы, скролл) и
+    // зацикливалось, если SW отдавал устаревший/мокнутый 401 из кеша.
+    // Теперь стреляем событие — AuthContext снимает юзера, гварды на
+    // React Router редиректят на /auth без full reload.
     if (err.response?.status === 401) {
       clearAuthState()
-      window.location.reload()
+      window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT))
       return Promise.reject(err)
     }
 
