@@ -260,6 +260,11 @@
             "self_role": "You cannot change your own role here.",
             "self_del": "You cannot delete your own account from the admin panel.",
             "action_fail": "Action failed"
+        },
+        "pagination": {
+            "prev": "Prev",
+            "next": "Next",
+            "range": "{{from}}–{{to}} of {{total}}"
         }
     },
     "auth": {

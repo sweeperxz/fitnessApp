@@ -132,7 +132,10 @@ export const findFoodByBarcode = barcode => api.get(`/foods/barcode/${barcode}`)
 export const getRecentFoods = () => api.get('/foods/recent').then(r => r.data)
 export const addRecentFood = d => api.post('/foods/recent', d).then(r => r.data)
 
-export const getAdminUsers = () => api.get('/admin/users').then(r => r.data)
+// `{ items, total, skip, limit }` — фронт пагинируется по total. Раньше
+// отдавал просто массив, и AdminPage обрезал список после 50-го юзера.
+export const getAdminUsers = ({ skip = 0, limit = 50 } = {}) =>
+  api.get('/admin/users', { params: { skip, limit } }).then(r => r.data)
 export const updateAdminUserRole = (id, role) => api.put(`/admin/users/${id}/role`, { role }).then(r => r.data)
 export const deleteAdminUser = id => api.delete(`/admin/users/${id}`).then(r => r.data)
 
