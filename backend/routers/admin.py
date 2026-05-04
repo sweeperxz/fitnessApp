@@ -17,19 +17,23 @@ from auth import get_admin_user, get_db
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-@router.get("/users", response_model=list[schemas.UserAdminResponse])
+@router.get("/users", response_model=schemas.UserAdminListResponse)
 def get_all_users(
     admin: models.User = Depends(get_admin_user),
     db: Session = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
 ):
-    return (
-        db.query(models.User)
-        .order_by(models.User.id.desc())
+    base = db.query(models.User)
+    total = base.count()
+    items = (
+        base.order_by(models.User.id.desc())
         .offset(skip)
         .limit(limit)
         .all()
+    )
+    return schemas.UserAdminListResponse(
+        items=items, total=total, skip=skip, limit=limit
     )
 
 

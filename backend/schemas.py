@@ -29,6 +29,15 @@ class UserAdminResponse(BaseModel):
     created_at: datetime
     class Config: from_attributes = True
 
+class UserAdminListResponse(BaseModel):
+    # Раньше /admin/users отдавал просто list[UserAdminResponse]; фронт
+    # не знал общего количества и обрезал список после первой страницы
+    # (limit=50). Теперь отдаём `items` + `total`, чтобы пагинировать.
+    items: list[UserAdminResponse]
+    total: int
+    skip: int
+    limit: int
+
 class UserRoleUpdate(BaseModel):
     role: str = Field(..., pattern="^(user|admin)$")
 
