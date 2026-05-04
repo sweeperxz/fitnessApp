@@ -5,6 +5,7 @@ import models, schemas
 
 SYNC_OP_ADD_MEAL = "nutrition.add_meal"
 SYNC_OP_LOG_WATER = "nutrition.log_water"
+SYNC_OP_CREATE_WORKOUT = "workouts.create"
 
 
 def _get_sync_operation(db: Session, user_id: int, op_id: str):
@@ -39,6 +40,18 @@ def _get_or_create_idempotent_resource(
             models.WaterLog.id == existing_op.resource_id,
             models.WaterLog.user_id == user_id,
         ).first()
+
+    if expected_resource_type == "workout":
+        from sqlalchemy.orm import joinedload
+        return (
+            db.query(models.Workout)
+            .options(joinedload(models.Workout.exercises))
+            .filter(
+                models.Workout.id == existing_op.resource_id,
+                models.Workout.user_id == user_id,
+            )
+            .first()
+        )
 
     return None
 
@@ -234,8 +247,18 @@ def get_workouts(db: Session, user_id: int, from_date=None, to_date=None):
     return q.order_by(models.Workout.day.desc()).all()
 
 def create_workout(db: Session, user_id: int, data: schemas.WorkoutCreate):
+    # Идемпотентность: если оффлайн-replay прислал тот же op_id повторно,
+    # отдаём ранее созданную тренировку, а не плодим дубль. Та же схема,
+    # что у add_meal/log_water — см. _get_or_create_idempotent_resource.
+    if data.op_id:
+        existing = _get_or_create_idempotent_resource(
+            db, user_id, data.op_id, SYNC_OP_CREATE_WORKOUT, "workout"
+        )
+        if existing:
+            return existing
+
     exercises_data = data.exercises
-    workout_dict = data.model_dump(exclude={'exercises'})
+    workout_dict = data.model_dump(exclude={'exercises', 'op_id'})
     w = models.Workout(user_id=user_id, **workout_dict)
     db.add(w)
     db.flush()  # get w.id without committing yet
@@ -243,7 +266,28 @@ def create_workout(db: Session, user_id: int, data: schemas.WorkoutCreate):
         for ex_data in exercises_data:
             ex = models.Exercise(workout_id=w.id, **ex_data.model_dump())
             db.add(ex)
-    db.commit()
+
+    if data.op_id:
+        db.add(models.SyncOperation(
+            user_id=user_id,
+            op_id=data.op_id,
+            operation_type=SYNC_OP_CREATE_WORKOUT,
+            resource_type="workout",
+            resource_id=w.id,
+        ))
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        if data.op_id:
+            existing = _get_or_create_idempotent_resource(
+                db, user_id, data.op_id, SYNC_OP_CREATE_WORKOUT, "workout"
+            )
+            if existing:
+                return existing
+        raise exc
+
     db.refresh(w)
     return w
 
