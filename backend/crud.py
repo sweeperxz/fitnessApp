@@ -320,11 +320,8 @@ def get_stats(db: Session, user_id: int, days: int = 30) -> schemas.Stats:
 
     workout_map = {r.day: r.cnt for r in workout_rows}
 
-    # Build daily stats from the 3 result maps
+    # Build daily stats (oldest -> today) for the response.
     day_stats = []
-    streak = 0
-    streak_active = True
-
     for i in range(days - 1, -1, -1):
         d = today - timedelta(days=i)
         m = meal_map.get(d)
@@ -340,11 +337,26 @@ def get_stats(db: Session, user_id: int, days: int = 30) -> schemas.Stats:
             workout_count=workout_map.get(d, 0),
         ))
 
-        if streak_active:
-            if cal > 0:
-                streak += 1
-            elif i != 0:
-                streak_active = False
+    # Текущий streak — считаем СПРАВА НАЛЕВО (от сегодня к самому старому
+    # дню окна), останавливаемся на первом «пустом» (cal==0). Сегодня
+    # допустимо иметь 0 (юзер ещё ничего не залогал, но streak в процессе),
+    # — оно не обнуляет серию, но и не считается +1.
+    #
+    # Прежняя реализация шла слева направо и при первом же 0-дне (что
+    # норма для большинства окон в 30 дней) обнуляла `streak_active`,
+    # из-за чего streak был 0 у всех, кроме идеальных юзеров.
+    streak = 0
+    for offset in range(0, days):
+        d = today - timedelta(days=offset)
+        m = meal_map.get(d)
+        cal = float(m.cal or 0) if m else 0.0
+        if cal > 0:
+            streak += 1
+        elif offset == 0:
+            # Сегодня без записей — серия не сломана, но и +1 не даём.
+            continue
+        else:
+            break
 
     active = [d for d in day_stats if d.calories > 0]
     return schemas.Stats(

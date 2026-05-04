@@ -57,8 +57,12 @@ class Profile(ProfileCreate):
 # ── Meals ─────────────────────────────────────────────────
 class MealCreate(BaseModel):
     day: date
-    meal_type: str
-    name: str
+    # Допустимые значения совпадают с фронтовым `utils/constants.MEAL_TYPES`
+    # (`Breakfast`/`Lunch`/`Dinner`/`Snack`). До этой валидации бэк
+    # принимал любую строку, включая опечатки и случайный мусор из
+    # оффлайн-replay'а — данные потом не группировались на UI.
+    meal_type: str = Field(..., pattern="^(Breakfast|Lunch|Dinner|Snack)$")
+    name: str = Field(..., min_length=1, max_length=200)
     op_id: Optional[str] = None
     calories: float = Field(default=0, ge=0, le=50000)
     protein: float = Field(default=0, ge=0, le=5000)
@@ -138,20 +142,30 @@ class GoogleAuthRequest(BaseModel):
     credential: str  # Google id_token
 
 class ChatMessage(BaseModel):
-    role: str # Ожидаем 'user' или 'assistant' из фронтенда
-    content: str
+    # Только 'user' и 'assistant' — `system` нельзя присылать с фронта,
+    # системный промпт мы формируем на бэке (см. routers/ai.py).
+    role: str = Field(..., pattern="^(user|assistant)$")
+    # Лимит длины каждого сообщения. Без него любой авторизованный юзер
+    # мог скормить Gemini десятки тысяч токенов в одном «сообщении» —
+    # прямой риск по биллингу.
+    content: str = Field(..., min_length=1, max_length=4000)
 
 class ChatRequest(BaseModel):
-    messages: list[ChatMessage]
+    # max_length=50 — типовой контекст AI-ассистента; больше в один запрос
+    # отправлять не имеет смысла, дешевле обрезать историю на клиенте.
+    messages: list[ChatMessage] = Field(..., min_length=1, max_length=50)
 
 
 class FoodItemBase(BaseModel):
     name: str
     brand: Optional[str] = ""
-    calories: int
-    protein: int
-    fat: int
-    carbs: int
+    # Float (не Int) — иначе в /foods/recent теряются десятые грамма КБЖУ.
+    # Meal использует Float; чтобы «недавние» не порезали 23.3 → 23 при
+    # каждом повторном использовании, держим тот же тип.
+    calories: float = Field(default=0, ge=0, le=50000)
+    protein: float = Field(default=0, ge=0, le=5000)
+    fat: float = Field(default=0, ge=0, le=5000)
+    carbs: float = Field(default=0, ge=0, le=5000)
 
 class FoodItemCreate(FoodItemBase):
     pass

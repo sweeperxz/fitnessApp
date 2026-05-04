@@ -111,10 +111,14 @@ class UserFood(Base):
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
     name = Column(String, index=True)
     brand = Column(String, nullable=True)
-    calories = Column(Integer)
-    protein = Column(Integer)
-    fat = Column(Integer)
-    carbs = Column(Integer)
+    # Раньше было Integer — терялась десятичная часть КБЖУ при сохранении в
+    # «недавние»; в Meal эти поля Float, поэтому накопительно у юзеров,
+    # которые часто переиспользуют продукт из «недавних», уезжали
+    # значения. Миграция 0009 переключает колонки на DOUBLE PRECISION.
+    calories = Column(Float)
+    protein = Column(Float)
+    fat = Column(Float)
+    carbs = Column(Float)
     last_used = Column(DateTime, default=utcnow)
 
     user = relationship("User", back_populates="foods")
