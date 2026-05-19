@@ -31,7 +31,11 @@ def create_workout(
     user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return crud.create_workout(db, user.id, data)
+    try:
+        return crud.create_workout(db, user.id, data)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(400, str(exc))
 
 
 @router.post("/{workout_id}/exercises", response_model=schemas.Exercise)
@@ -41,7 +45,11 @@ def add_exercise(
     user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    ex = crud.add_exercise(db, workout_id, user.id, data)
+    try:
+        ex = crud.add_exercise(db, workout_id, user.id, data)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(400, str(exc))
     if not ex:
         raise HTTPException(404, "Workout not found")
     return ex

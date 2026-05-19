@@ -12,9 +12,6 @@ import ProfileTabBar from './profile/components/ProfileTabBar'
 import ProfileGoalsCard from './profile/components/ProfileGoalsCard'
 import ProfileMacrosCard from './profile/components/ProfileMacrosCard'
 import ProfileSettingsCard from './profile/components/ProfileSettingsCard'
-import ProfileNotificationsCard from './profile/components/ProfileNotificationsCard'
-import ProfileAccountCard from './profile/components/ProfileAccountCard'
-import ProfileAboutCard from './profile/components/ProfileAboutCard'
 
 const GOALS = [{ v: 'lose', lKey: 'goals.lose' }, { v: 'maintain', lKey: 'goals.maintain' }, { v: 'gain', lKey: 'goals.gain' }]
 const ACTS = [{ v: 'low', lKey: 'activity.low' }, { v: 'medium', lKey: 'activity.medium' }, { v: 'high', lKey: 'activity.high' }]
@@ -235,25 +232,14 @@ export default function ProfilePage() {
             onThemeToggle={handleThemeToggle}
             onLanguageChange={handleLanguageChange}
             onFatsecretRegionChange={value => upd('fatsecret_region', value)}
-            t={t}
-          />
-
-          {pushSupported && (
-            <ProfileNotificationsCard
-              isSubscribed={isSubscribed}
-              onToggle={handlePushToggle}
-              onTestPush={testPush}
-              t={t}
-            />
-          )}
-
-          <ProfileAccountCard
+            pushSupported={pushSupported}
+            isSubscribed={isSubscribed}
+            onPushToggle={handlePushToggle}
+            onTestPush={testPush}
             email={user?.email}
             onLogout={handleLogout}
             t={t}
           />
-
-          <ProfileAboutCard t={t} />
 
           <button className="btn-primary profile-save-btn" onClick={save}>
             {saved ? t('common.saved') : t('common.save')}

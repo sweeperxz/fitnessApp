@@ -439,76 +439,76 @@ textarea.input {
     right: 0;
     bottom: 0;
     height: 100dvh;
-    /* Динамическая высота */
     display: flex;
     align-items: flex-end;
-    /* Модалка падает вниз */
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     z-index: 1000;
+    animation: fadeIn 0.25s ease-out forwards;
 }
 
 .modal {
     background: var(--bg2);
     border: 1px solid var(--border);
-    border-radius: 20px 20px 0 0;
+    border-radius: 28px 28px 0 0;
     border-bottom: none;
-    padding: 18px 18px calc(env(safe-area-inset-bottom, 20px) + 10px);
+    padding: 20px 20px calc(env(safe-area-inset-bottom, 20px) + 12px);
     width: 100%;
-
-    /* ИСПРАВЛЕНИЕ 3: */
-    max-height: 92vh;
-    /* Фолбэк для старых устройств */
-    max-height: 92dvh;
-    /* Современный вариант для iOS */
-
+    max-height: 94dvh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    animation: slideUp 0.45s cubic-bezier(0.34, 1.46, 0.64, 1);
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.15);
+    animation: modalSlideUp 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .modal-handle {
-    width: 36px;
-    height: 4px;
+    width: 40px;
+    height: 5px;
     background: var(--bg4);
-    border-radius: 2px;
-    margin: 0 auto 18px;
+    border-radius: 2.5px;
+    margin: 0 auto 16px;
+    opacity: 0.8;
 }
 
 .modal-title {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 800;
-    margin-bottom: 18px;
+    margin-bottom: 20px;
+    letter-spacing: -0.5px;
+    color: var(--text);
 }
 
 /* ─── Food tabs ─────────────────────────────────────────── */
 .food-tabs {
     display: flex;
     background: var(--bg3);
-    border-radius: var(--r-sm);
-    padding: 3px;
-    gap: 2px;
-    margin-bottom: 16px;
+    border-radius: 12px;
+    padding: 4px;
+    gap: 4px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border);
 }
 
 .food-tab {
     flex: 1;
-    padding: 8px 4px;
+    padding: 10px 4px;
     text-align: center;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 700;
     color: var(--text2);
     cursor: pointer;
-    border-radius: 6px;
+    border-radius: 8px;
     border: none;
     background: none;
     font-family: var(--font);
-    transition: all 0.18s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .food-tab.active {
     background: var(--bg2);
     color: var(--blue2);
-    box-shadow: inset 0 -2px 0 var(--blue);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(255, 255, 255, 0.05);
 }
 
 /* ─── Chips ─────────────────────────────────────────────── */
@@ -1365,6 +1365,15 @@ textarea.input {
     to {
         transform: translateY(0);
         opacity: 1;
+    }
+}
+
+@keyframes modalSlideUp {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: translateY(0);
     }
 }
 

@@ -12,8 +12,19 @@ export default function NewWorkoutSheet({ onClose, onSave, day }) {
   const [saving, setSaving] = useState(false)
 
   const addFromLib = list => setExercises(prev => {
-    const ex = new Set(prev.map(e => e.name))
-    return [...prev, ...list.filter(e => !ex.has(e.n)).map(e => ({ name: e.n, sets: 3, reps: 10, weight_kg: 0 }))]
+    const existing = new Set(prev.map(e => e.library_exercise_id || e.name))
+    return [
+      ...prev,
+      ...list
+        .filter(e => !existing.has(e.id) && !existing.has(e.name))
+        .map(e => ({
+          library_exercise_id: typeof e.id === 'number' ? e.id : undefined,
+          name: e.name,
+          sets: 3,
+          reps: 10,
+          weight_kg: 0,
+        })),
+    ]
   })
 
   const upd = (i, k, v) => setExercises(e => e.map((ex, idx) => idx === i ? { ...ex, [k]: v } : ex))
@@ -24,7 +35,13 @@ export default function NewWorkoutSheet({ onClose, onSave, day }) {
     try {
       const validExercises = exercises
         .filter(e => e.name.trim())
-        .map(ex => ({ name: ex.name, sets: +ex.sets, reps: +ex.reps, weight_kg: +ex.weight_kg }))
+        .map(ex => ({
+          name: ex.name,
+          library_exercise_id: ex.library_exercise_id,
+          sets: +ex.sets,
+          reps: +ex.reps,
+          weight_kg: +ex.weight_kg,
+        }))
 
       await onSave({
         title,

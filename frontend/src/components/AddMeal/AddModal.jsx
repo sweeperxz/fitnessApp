@@ -51,7 +51,8 @@ export default function AddModal({ onClose, onAdd }) {
                     {tab === 2 && (
                         <ManualTab
                             initial={selected ? {
-                                name: selected.name + (selected.brand ? ` (${selected.brand})` : ''),
+                                name: selected.name,
+                                brand: selected.brand,
                                 calories: selected.calories,
                                 protein: selected.protein,
                                 fat: selected.fat,

@@ -16,6 +16,7 @@ from routers import (
     admin,
     ai,
     auth as auth_router,
+    exercise_library,
     foods,
     health,
     nutrition,
@@ -58,6 +59,7 @@ app.include_router(admin.router)
 app.include_router(profile.router)
 app.include_router(nutrition.router)
 app.include_router(workouts.router)
+app.include_router(exercise_library.router)
 app.include_router(stats.router)
 app.include_router(ai.router)
 app.include_router(foods.router)

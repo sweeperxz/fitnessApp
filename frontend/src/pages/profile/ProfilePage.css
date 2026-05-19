@@ -1,22 +1,28 @@
 .profile-user-card {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 12px;
+  gap: 16px;
+  margin-bottom: 20px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
 }
 
 .profile-user-avatar {
-  width: 50px;
-  height: 50px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--blue2), var(--blue));
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
-  font-weight: 800;
+  font-size: 22px;
+  font-weight: 850;
   color: #fff;
   flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
 }
 
 .profile-user-meta {
@@ -25,112 +31,121 @@
 }
 
 .profile-user-name {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 800;
+  color: var(--text);
 }
 
 .profile-user-email {
   font-size: 12px;
-  color: var(--text2);
+  color: var(--text3);
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* ─── Profile Tab Bar (Segmented Control) ─── */
 .profile-tab-bar {
-  margin-bottom: 16px;
+  display: flex;
+  background: var(--bg3);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
 }
 
 .profile-tab-btn {
-  padding: 10px 0;
-  border-radius: 8px;
-  color: var(--text3);
+  flex: 1;
+  padding: 10px 4px;
+  text-align: center;
+  font-size: 13px;
   font-weight: 700;
-  transition: all 0.15s;
+  color: var(--text2);
+  cursor: pointer;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  font-family: var(--font);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .profile-tab-btn.active {
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  background: var(--bg2);
+  color: var(--blue2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(255, 255, 255, 0.05);
+}
+
+/* ─── iOS Settings Groups ─── */
+.profile-settings-group {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+
+.profile-settings-group-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 12px 0 6px 0;
+  border-bottom: 1.5px solid var(--border);
+}
+
+.profile-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-settings-row:last-child {
+  border-bottom: none;
+}
+
+.profile-settings-label {
+  font-size: 14px;
+  font-weight: 700;
   color: var(--text);
 }
 
-.profile-activity-row {
+.profile-settings-value {
   display: flex;
-  gap: 8px;
-}
-
-.profile-activity-btn {
-  flex: 1;
-  padding: 10px 4px;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--border);
-  background: var(--bg3);
+  align-items: center;
+  gap: 10px;
   color: var(--text2);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: var(--font);
-  text-align: center;
-  transition: all 0.15s;
-}
-
-.profile-activity-btn.is-active {
-  border-color: var(--blue);
-  background: var(--blue-glow);
-  color: var(--blue);
-}
-
-.profile-recalc-btn {
-  width: 100%;
-  padding: 11px 0;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--blue);
-  background: var(--blue-glow);
-  color: var(--blue);
-  font-family: var(--font);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.profile-recalc-btn:disabled {
-  opacity: 0.6;
-}
-
-.profile-save-btn {
-  margin-bottom: 8px;
 }
 
 .profile-setting-clickable {
   cursor: pointer;
+  transition: opacity 0.15s;
 }
 
-.profile-theme-row {
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 12px;
-  margin-bottom: 12px;
+.profile-setting-clickable:active {
+  opacity: 0.7;
 }
 
-.profile-setting-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text2);
-  font-weight: 600;
-}
-
+/* Switches */
 .profile-switch {
-  width: 40px;
+  width: 44px;
   height: 24px;
   border-radius: 12px;
-  background: var(--bg3);
+  background: var(--bg4);
   position: relative;
-  transition: background 0.2s;
+  transition: background 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  border: 1px solid var(--border);
 }
 
 .profile-switch.is-on {
   background: var(--blue);
+  border-color: var(--blue2);
 }
 
 .profile-switch-knob {
@@ -139,14 +154,14 @@
   border-radius: 50%;
   background: #fff;
   position: absolute;
-  top: 2px;
-  left: 2px;
-  transition: left 0.2s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  top: 1px;
+  left: 1px;
+  transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .profile-switch-knob.is-on {
-  left: 18px;
+  left: 21px;
 }
 
 .profile-language-select {
@@ -161,27 +176,11 @@
   outline: none;
 }
 
-.profile-test-row {
+/* Save Button spacing */
+.profile-save-btn {
   margin-top: 8px;
-}
-
-.profile-test-label {
-  color: var(--blue);
-}
-
-.profile-logout-label {
-  color: var(--red);
-}
-
-.profile-arrow {
-  width: 14px;
-  height: 14px;
-}
-
-.profile-arrow--blue {
-  color: var(--blue);
-}
-
-.profile-arrow--red {
-  color: var(--red);
+  margin-bottom: 24px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.25);
 }

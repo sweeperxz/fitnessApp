@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, Index
+from sqlalchemy import Boolean, Column, Integer, String, Float, Date, DateTime, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime, timezone
@@ -92,25 +92,44 @@ class Workout(Base):
     user      = relationship("User", back_populates="workouts")
     exercises = relationship("Exercise", back_populates="workout", cascade="all, delete")
 
+class ExerciseLibraryItem(Base):
+    __tablename__ = "exercise_library"
+    __table_args__ = (
+        Index('ix_exercise_library_muscle_name', 'muscle', 'name'),
+    )
+
+    id          = Column(Integer, primary_key=True)
+    name        = Column(String, nullable=False, unique=True, index=True)
+    muscle      = Column(String, nullable=False, index=True)
+    equipment   = Column(String, default="")
+    description = Column(String, default="")
+    is_active   = Column(Boolean, default=True, nullable=False)
+
+    exercises = relationship("Exercise", back_populates="library_item")
+
+
 class Exercise(Base):
     __tablename__ = "exercises"
-    id         = Column(Integer, primary_key=True)
-    workout_id = Column(Integer, ForeignKey("workouts.id"))
-    name       = Column(String)
-    sets       = Column(Integer, default=3)
-    reps       = Column(Integer, default=10)
-    weight_kg  = Column(Float, default=0)
+    id                  = Column(Integer, primary_key=True)
+    workout_id          = Column(Integer, ForeignKey("workouts.id"))
+    library_exercise_id = Column(Integer, ForeignKey("exercise_library.id"), nullable=True, index=True)
+    name                = Column(String)
+    sets                = Column(Integer, default=3)
+    reps                = Column(Integer, default=10)
+    weight_kg           = Column(Float, default=0)
 
     workout = relationship("Workout", back_populates="exercises")
+    library_item = relationship("ExerciseLibraryItem", back_populates="exercises")
 
 
 class UserFood(Base):
     __tablename__ = "user_foods"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=True)
     name = Column(String, index=True)
     brand = Column(String, nullable=True)
+    barcode = Column(String, unique=True, index=True, nullable=True)
     calories = Column(Integer)
     protein = Column(Integer)
     fat = Column(Integer)

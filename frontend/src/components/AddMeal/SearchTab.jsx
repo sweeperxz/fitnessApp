@@ -47,20 +47,55 @@ export default function SearchTab({ onSelect }) {
 
     return (
         <>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <div style={{ position: 'relative', marginBottom: 16 }}>
                 <input
                     className="input"
                     placeholder={t('meals.search_placeholder')}
                     value={q}
                     onChange={e => setQ(e.target.value)}
-                    style={{ flex: 1 }}
+                    style={{
+                        paddingLeft: 40,
+                        paddingRight: 40,
+                    }}
                 />
-                <div style={{ width: 44, height: 44, borderRadius: 'var(--r-sm)', background: 'var(--bg3)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    {loading
-                        ? <div style={{ width: 16, height: 16, border: '2px solid var(--text3)', borderTopColor: 'var(--blue)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                        : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth={2.5} strokeLinecap="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-                    }
+                <div style={{
+                    position: 'absolute',
+                    left: 14,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    pointerEvents: 'none'
+                }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth={2.5} strokeLinecap="round">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.35-4.35" />
+                    </svg>
                 </div>
+                {loading && (
+                    <div style={{
+                        position: 'absolute',
+                        right: 14,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 16,
+                        height: 16,
+                    }}>
+                        <div style={{
+                            width: 16,
+                            height: 16,
+                            border: '2px solid var(--text3)',
+                            borderTopColor: 'var(--blue)',
+                            borderRadius: '50%',
+                            animation: 'spin 0.8s linear infinite',
+                            boxSizing: 'border-box'
+                        }} />
+                    </div>
+                )}
             </div>
 
             {!isSearching && recentLoaded && recent.length > 0 && (
@@ -73,8 +108,37 @@ export default function SearchTab({ onSelect }) {
                 <div style={{ textAlign: 'center', padding: 24, color: 'var(--text2)', fontSize: 13 }}>{t('meals.search_searching')}</div>
             )}
             {isSearching && !loading && done && !results.length && (
-                <div style={{ textAlign: 'center', padding: 24, color: 'var(--text2)', fontSize: 13, lineHeight: 1.5 }}>
-                    {t('meals.search_not_found')}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '24px 0' }}>
+                    <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 13, lineHeight: 1.5 }}>
+                        {t('meals.search_not_found')}
+                    </div>
+                    <button
+                        onClick={() => {
+                            onSelect({ name: q, calories: '' })
+                        }}
+                        style={{
+                            width: '100%',
+                            background: 'rgba(59, 130, 246, 0.08)',
+                            border: '1px solid rgba(59, 130, 246, 0.25)',
+                            color: 'var(--blue2)',
+                            borderRadius: 'var(--r-sm)',
+                            padding: '12px 16px',
+                            fontSize: 14,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8,
+                            transition: 'all 0.2s',
+                        }}
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        {t('meals.barcode_tab.create_product')}
+                    </button>
                 </div>
             )}
             {!isSearching && recentLoaded && recent.length === 0 && (
@@ -83,6 +147,37 @@ export default function SearchTab({ onSelect }) {
                 </div>
             )}
 
+            {isSearching && !loading && results.length > 0 && (
+                <button
+                    onClick={() => {
+                        onSelect({ name: q, calories: '' })
+                    }}
+                    style={{
+                        width: '100%',
+                        marginTop: 16,
+                        marginBottom: 16,
+                        background: 'none',
+                        border: '1px dashed var(--border)',
+                        color: 'var(--text2)',
+                        borderRadius: 'var(--r-sm)',
+                        padding: '12px 16px',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        transition: 'all 0.2s',
+                    }}
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    {t('meals.barcode_tab.create_product')}
+                </button>
+            )}
             {list.map((item, i) => (
                 <div key={i} onClick={() => handleSelect(item)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
                     <div style={{ flex: 1, marginRight: 12 }}>

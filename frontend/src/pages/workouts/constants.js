@@ -1,6 +1,6 @@
 export const MUSCLE_KEYS = ['All', 'Chest', 'Back', 'Legs', 'Shoulders', 'Biceps', 'Triceps', 'Abs', 'Cardio']
 
-export const DB = [
+export const FALLBACK_EXERCISES = [
   { n: 'Жим лёжа', m: 'Chest' }, { n: 'Разводка гантелями', m: 'Chest' }, { n: 'Отжимания', m: 'Chest' }, { n: 'Кроссовер', m: 'Chest' },
   { n: 'Тяга верхнего блока', m: 'Back' }, { n: 'Тяга штанги в наклоне', m: 'Back' }, { n: 'Становая тяга', m: 'Back' }, { n: 'Подтягивания', m: 'Back' }, { n: 'Гиперэкстензия', m: 'Back' },
   { n: 'Приседания со штангой', m: 'Legs' }, { n: 'Жим ногами', m: 'Legs' }, { n: 'Выпады', m: 'Legs' }, { n: 'Сгибание ног', m: 'Legs' }, { n: 'Разгибание ног', m: 'Legs' }, { n: 'Подъём на носки', m: 'Legs' },

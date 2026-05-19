@@ -93,8 +93,18 @@ class WaterLog(WaterLogCreate):
     class Config: from_attributes = True
 
 # ── Workouts ──────────────────────────────────────────────
+class ExerciseLibraryItem(BaseModel):
+    id: int
+    name: str
+    muscle: str
+    equipment: str = ""
+    description: str = ""
+    is_active: bool
+    class Config: from_attributes = True
+
 class ExerciseCreate(BaseModel):
     name: str
+    library_exercise_id: Optional[int] = None
     sets: int = Field(default=3, ge=1, le=100)
     reps: int = Field(default=10, ge=1, le=1000)
     weight_kg: float = Field(default=0, ge=0, le=1000)
@@ -152,6 +162,7 @@ class FoodItemBase(BaseModel):
     protein: int
     fat: int
     carbs: int
+    barcode: Optional[str] = None
 
 class FoodItemCreate(FoodItemBase):
     pass

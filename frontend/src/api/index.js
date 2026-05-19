@@ -104,6 +104,7 @@ export const getWorkouts = p => api.get('/workouts', { params: p }).then(r => r.
 export const createWorkout = d => api.post('/workouts', d).then(r => r.data)
 export const addExercise = (wid, d) => api.post(`/workouts/${wid}/exercises`, d).then(r => r.data)
 export const deleteWorkout = id => api.delete(`/workouts/${id}`)
+export const getExerciseLibrary = p => api.get('/exercise-library', { params: p }).then(r => r.data)
 
 export const getStats = (days = 30) => api.get('/stats', { params: { days } }).then(r => r.data)
 

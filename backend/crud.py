@@ -226,6 +226,35 @@ def get_idempotent_water_log(db: Session, user_id: int, op_id: str):
     )
 
 # ── Workouts ──────────────────────────────────────────────
+def get_exercise_library(db: Session, muscle: str | None = None, q: str | None = None, equipment: str | None = None):
+    query = db.query(models.ExerciseLibraryItem).filter(models.ExerciseLibraryItem.is_active == True)
+
+    if muscle and muscle != "All":
+        query = query.filter(models.ExerciseLibraryItem.muscle == muscle)
+    if equipment:
+        query = query.filter(models.ExerciseLibraryItem.equipment == equipment)
+    if q:
+        query = query.filter(models.ExerciseLibraryItem.name.ilike(f"%{q.strip()}%"))
+
+    return query.order_by(models.ExerciseLibraryItem.muscle, models.ExerciseLibraryItem.name).all()
+
+
+def _exercise_payload(db: Session, data: schemas.ExerciseCreate):
+    payload = data.model_dump()
+    library_exercise_id = payload.get("library_exercise_id")
+
+    if library_exercise_id:
+        item = db.query(models.ExerciseLibraryItem).filter(
+            models.ExerciseLibraryItem.id == library_exercise_id,
+            models.ExerciseLibraryItem.is_active == True,
+        ).first()
+        if not item:
+            raise ValueError("Exercise library item not found")
+        payload["name"] = item.name
+
+    return payload
+
+
 def get_workouts(db: Session, user_id: int, from_date=None, to_date=None):
     from sqlalchemy.orm import joinedload
     q = db.query(models.Workout).options(joinedload(models.Workout.exercises)).filter(models.Workout.user_id == user_id)
@@ -241,7 +270,7 @@ def create_workout(db: Session, user_id: int, data: schemas.WorkoutCreate):
     db.flush()  # get w.id without committing yet
     if exercises_data:
         for ex_data in exercises_data:
-            ex = models.Exercise(workout_id=w.id, **ex_data.model_dump())
+            ex = models.Exercise(workout_id=w.id, **_exercise_payload(db, ex_data))
             db.add(ex)
     db.commit()
     db.refresh(w)
@@ -255,7 +284,9 @@ def add_exercise(db: Session, workout_id: int, user_id: int, data: schemas.Exerc
     ).first()
     if not w:
         return None
-    ex = models.Exercise(workout_id=workout_id, **data.model_dump())
+    exercise_payload = _exercise_payload(db, data)
+
+    ex = models.Exercise(workout_id=workout_id, **exercise_payload)
     db.add(ex)
     db.commit()
     db.refresh(ex)

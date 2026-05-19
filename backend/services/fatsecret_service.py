@@ -2,10 +2,13 @@ import httpx
 import base64
 import re
 import time
+import logging
 from typing import Any
 from fastapi import HTTPException
 
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 TOKEN_URL = "https://oauth.fatsecret.com/connect/token"
 API_URL = "https://platform.fatsecret.com/rest/server.api"
@@ -287,25 +290,150 @@ async def _fatsecret_call(params: dict[str, Any]) -> dict[str, Any]:
     if response.status_code >= 400:
         raise HTTPException(502, "FatSecret request failed")
 
-    return response.json()
+    res_json = response.json()
+
+    # Fallback if account doesn't support Premium Localization
+    if isinstance(res_json, dict) and "error" in res_json:
+        err = res_json.get("error", {})
+        err_msg = err.get("message", "")
+        if "localization" in err_msg.lower() or "premium feature" in err_msg.lower():
+            clean_params = {k: v for k, v in params.items() if k not in ("region", "language")}
+            if clean_params != params:
+                logger.info("FatSecret account does not support localization. Retrying without region/language.")
+                async with httpx.AsyncClient(timeout=20.0) as retry_client:
+                    retry_res = await retry_client.post(API_URL, data={**clean_params, "format": "json"}, headers=headers)
+                if retry_res.status_code < 400:
+                    return retry_res.json()
+
+    return res_json
+
+
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+
+
+def _get_target_lang(region: str | None, query: str | None = None) -> str | None:
+    if region:
+        r = region.lower()
+        if r == "ua":
+            return "Ukrainian"
+        if r == "ru":
+            return "Russian"
+    if query and _contains_cyrillic(query):
+        return "Ukrainian"
+    return None
+
+
+async def _translate_with_gemini(text: str, target_lang: str) -> str:
+    if not settings.GEMINI_API_KEY or not text.strip():
+        return text
+
+    prompt = f"Translate the following food product name or search query to {target_lang}. Return ONLY the direct translation, nothing else, no comments or prefixes:\n{text}"
+
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 100}
+    }
+    headers = {
+        "x-goog-api-key": settings.GEMINI_API_KEY,
+        "Content-Type": "application/json"
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            res = await client.post(GEMINI_URL, json=payload, headers=headers, timeout=10.0)
+            res.raise_for_status()
+            data = res.json()
+            translated = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            if translated:
+                return translated
+        except Exception as e:
+            logger.error(f"Gemini translation failed: {e}")
+    return text
+
+
+async def _translate_food_items(items: list[dict[str, Any]], target_lang: str) -> list[dict[str, Any]]:
+    if not settings.GEMINI_API_KEY or not items:
+        return items
+
+    names_to_translate = []
+    for idx, item in enumerate(items):
+        names_to_translate.append(f"{idx}: {item.get('name', '')}")
+        if item.get("brand"):
+            names_to_translate.append(f"{idx}_brand: {item.get('brand', '')}")
+
+    names_block = "\n".join(names_to_translate)
+    prompt = (
+        f"You are a professional nutrition translator. "
+        f"Translate the following list of food names and brands to {target_lang}. "
+        f"Maintain the exact format (index: translated_text). "
+        f"Return ONLY the translated list. Do not explain or add introduction.\n\n"
+        f"{names_block}"
+    )
+
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 2000}
+    }
+    headers = {
+        "x-goog-api-key": settings.GEMINI_API_KEY,
+        "Content-Type": "application/json"
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            res = await client.post(GEMINI_URL, json=payload, headers=headers, timeout=15.0)
+            res.raise_for_status()
+            data = res.json()
+            translated_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+            translations = {}
+            for line in translated_text.split("\n"):
+                if ":" in line:
+                    parts = line.split(":", 1)
+                    if len(parts) == 2:
+                        key, val = parts
+                        translations[key.strip()] = val.strip()
+
+            for idx, item in enumerate(items):
+                key = str(idx)
+                brand_key = f"{idx}_brand"
+                if key in translations:
+                    item["name"] = translations[key]
+                if brand_key in translations:
+                    item["brand"] = translations[brand_key]
+        except Exception as e:
+            logger.error(f"Gemini batch translation failed: {e}")
+    return items
 
 
 async def search_foods(query: str, limit: int = 8, region: str | None = None) -> list[dict[str, Any]]:
     normalized_limit = max(1, min(limit, 50))
+    target_lang = _get_target_lang(region, query)
 
-    for params in _build_search_attempts(query, normalized_limit, region):
+    # Translate query to English if it contains Cyrillic characters
+    search_query = query
+    if target_lang and _contains_cyrillic(query):
+        search_query = await _translate_with_gemini(query, "English")
+
+    for params in _build_search_attempts(search_query, normalized_limit, region):
         payload = await _fatsecret_call(params)
         items = await _extract_foods_from_search_response(payload, normalized_limit)
         if items:
+            if target_lang:
+                items = await _translate_food_items(items, target_lang)
             return items
 
     return []
 
 
-async def get_food_by_barcode(barcode: str) -> dict[str, Any] | None:
+async def get_food_by_barcode(barcode: str, region: str | None = None) -> dict[str, Any] | None:
+    normalized_region = normalize_region(region)
+    region_params = REGION_PARAMS[normalized_region]
+
     payload = await _fatsecret_call({
         "method": "food.find_id_for_barcode",
         "barcode": barcode,
+        **region_params
     })
     food_id = _extract_food_id_from_barcode_response(payload)
     if not food_id:
@@ -314,10 +442,22 @@ async def get_food_by_barcode(barcode: str) -> dict[str, Any] | None:
     food_payload = await _fatsecret_call({
         "method": "food.get",
         "food_id": food_id,
+        **region_params
     })
 
     raw_food = food_payload.get("food")
     if not isinstance(raw_food, dict):
         return None
 
-    return _normalize_food(raw_food)
+    food_item = _normalize_food(raw_food)
+    if not food_item:
+        return None
+
+    # Translate the food item to the target language
+    target_lang = _get_target_lang(region)
+    if target_lang:
+        translated_items = await _translate_food_items([food_item], target_lang)
+        if translated_items:
+            food_item = translated_items[0]
+
+    return food_item
