@@ -223,6 +223,10 @@
             "title": "No workouts",
             "text": "Press + to add for {{date}}"
         },
+        "errors": {
+            "delete_failed": "Couldn't delete workout. Try again.",
+            "delete_offline_queued": "You're offline — delete will be retried when back online."
+        },
         "add": {
             "title": "New Workout",
             "name_label": "Workout Title",
@@ -295,6 +299,11 @@
             "self_role": "You cannot change your own role here.",
             "self_del": "You cannot delete your own account from the admin panel.",
             "action_fail": "Action failed"
+        },
+        "pagination": {
+            "prev": "Prev",
+            "next": "Next",
+            "range": "{{from}}–{{to}} of {{total}}"
         }
     },
     "auth": {

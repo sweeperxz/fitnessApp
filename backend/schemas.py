@@ -29,6 +29,15 @@ class UserAdminResponse(BaseModel):
     created_at: datetime
     class Config: from_attributes = True
 
+class UserAdminListResponse(BaseModel):
+    # Раньше /admin/users отдавал просто list[UserAdminResponse]; фронт
+    # не знал общего количества и обрезал список после первой страницы
+    # (limit=50). Теперь отдаём `items` + `total`, чтобы пагинировать.
+    items: list[UserAdminResponse]
+    total: int
+    skip: int
+    limit: int
+
 class UserRoleUpdate(BaseModel):
     role: str = Field(..., pattern="^(user|admin)$")
 
@@ -57,8 +66,12 @@ class Profile(ProfileCreate):
 # ── Meals ─────────────────────────────────────────────────
 class MealCreate(BaseModel):
     day: date
-    meal_type: str
-    name: str
+    # Допустимые значения совпадают с фронтовым `utils/constants.MEAL_TYPES`
+    # (`Breakfast`/`Lunch`/`Dinner`/`Snack`). До этой валидации бэк
+    # принимал любую строку, включая опечатки и случайный мусор из
+    # оффлайн-replay'а — данные потом не группировались на UI.
+    meal_type: str = Field(..., pattern="^(Breakfast|Lunch|Dinner|Snack)$")
+    name: str = Field(..., min_length=1, max_length=200)
     op_id: Optional[str] = None
     calories: float = Field(default=0, ge=0, le=50000)
     protein: float = Field(default=0, ge=0, le=5000)
@@ -127,13 +140,24 @@ class Exercise(BaseModel):
 
 class WorkoutCreate(BaseModel):
     day: date
-    title: str = "Тренировка"
-    notes: str = ""
+    title: str = Field(default="Тренировка", min_length=1, max_length=200)
+    notes: str = Field(default="", max_length=2000)
     exercises: Optional[List[ExerciseCreate]] = None
+    # op_id используется для дедупликации при оффлайн-replay'е (см.
+    # crud.create_workout). До этого PR'а workout мог попасть в БД дважды,
+    # если очередь оффлайн-записи переотправляла тот же запрос после того,
+    # как сервер уже принял первый.
+    op_id: Optional[str] = None
 
-class Workout(WorkoutCreate):
+class Workout(BaseModel):
+    # Раньше Workout наследовал WorkoutCreate. С добавлением op_id в Create
+    # это утянуло бы op_id в ответ — а это поле служебное, не для UI.
+    # Поэтому Workout явно перечисляет свои поля.
     id: int
     user_id: int
+    day: date
+    title: str
+    notes: str = ""
     created_at: datetime
     exercises: List[Exercise] = []
     class Config: from_attributes = True
@@ -159,20 +183,30 @@ class GoogleAuthRequest(BaseModel):
     credential: str  # Google id_token
 
 class ChatMessage(BaseModel):
-    role: str # Ожидаем 'user' или 'assistant' из фронтенда
-    content: str
+    # Только 'user' и 'assistant' — `system` нельзя присылать с фронта,
+    # системный промпт мы формируем на бэке (см. routers/ai.py).
+    role: str = Field(..., pattern="^(user|assistant)$")
+    # Лимит длины каждого сообщения. Без него любой авторизованный юзер
+    # мог скормить Gemini десятки тысяч токенов в одном «сообщении» —
+    # прямой риск по биллингу.
+    content: str = Field(..., min_length=1, max_length=4000)
 
 class ChatRequest(BaseModel):
-    messages: list[ChatMessage]
+    # max_length=50 — типовой контекст AI-ассистента; больше в один запрос
+    # отправлять не имеет смысла, дешевле обрезать историю на клиенте.
+    messages: list[ChatMessage] = Field(..., min_length=1, max_length=50)
 
 
 class FoodItemBase(BaseModel):
     name: str
     brand: Optional[str] = ""
-    calories: float = Field(default=0.0, ge=0)
-    protein: float = Field(default=0.0, ge=0)
-    fat: float = Field(default=0.0, ge=0)
-    carbs: float = Field(default=0.0, ge=0)
+    # Float (не Int) — иначе в /foods/recent теряются десятые грамма КБЖУ.
+    # Meal использует Float; чтобы «недавние» не порезали 23.3 → 23 при
+    # каждом повторном использовании, держим тот же тип.
+    calories: float = Field(default=0.0, ge=0, le=50000)
+    protein: float = Field(default=0.0, ge=0, le=5000)
+    fat: float = Field(default=0.0, ge=0, le=5000)
+    carbs: float = Field(default=0.0, ge=0, le=5000)
     barcode: Optional[str] = None
 
 class FoodItemCreate(FoodItemBase):

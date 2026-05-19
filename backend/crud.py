@@ -5,6 +5,7 @@ import models, schemas
 
 SYNC_OP_ADD_MEAL = "nutrition.add_meal"
 SYNC_OP_LOG_WATER = "nutrition.log_water"
+SYNC_OP_CREATE_WORKOUT = "workouts.create"
 
 
 def _get_sync_operation(db: Session, user_id: int, op_id: str):
@@ -39,6 +40,18 @@ def _get_or_create_idempotent_resource(
             models.WaterLog.id == existing_op.resource_id,
             models.WaterLog.user_id == user_id,
         ).first()
+
+    if expected_resource_type == "workout":
+        from sqlalchemy.orm import joinedload
+        return (
+            db.query(models.Workout)
+            .options(joinedload(models.Workout.exercises))
+            .filter(
+                models.Workout.id == existing_op.resource_id,
+                models.Workout.user_id == user_id,
+            )
+            .first()
+        )
 
     return None
 
@@ -263,8 +276,18 @@ def get_workouts(db: Session, user_id: int, from_date=None, to_date=None):
     return q.order_by(models.Workout.day.desc()).all()
 
 def create_workout(db: Session, user_id: int, data: schemas.WorkoutCreate):
+    # Идемпотентность: если оффлайн-replay прислал тот же op_id повторно,
+    # отдаём ранее созданную тренировку, а не плодим дубль. Та же схема,
+    # что у add_meal/log_water — см. _get_or_create_idempotent_resource.
+    if data.op_id:
+        existing = _get_or_create_idempotent_resource(
+            db, user_id, data.op_id, SYNC_OP_CREATE_WORKOUT, "workout"
+        )
+        if existing:
+            return existing
+
     exercises_data = data.exercises
-    workout_dict = data.model_dump(exclude={'exercises'})
+    workout_dict = data.model_dump(exclude={'exercises', 'op_id'})
     w = models.Workout(user_id=user_id, **workout_dict)
     db.add(w)
     db.flush()  # get w.id without committing yet
@@ -278,7 +301,27 @@ def create_workout(db: Session, user_id: int, data: schemas.WorkoutCreate):
             for s in sets_data:
                 db_set = models.ExerciseSet(exercise_id=ex.id, **s)
                 db.add(db_set)
-    db.commit()
+
+    if data.op_id:
+        db.add(models.SyncOperation(
+            user_id=user_id,
+            op_id=data.op_id,
+            operation_type=SYNC_OP_CREATE_WORKOUT,
+            resource_type="workout",
+            resource_id=w.id,
+        ))
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        if data.op_id:
+            existing = _get_or_create_idempotent_resource(
+                db, user_id, data.op_id, SYNC_OP_CREATE_WORKOUT, "workout"
+            )
+            if existing:
+                return existing
+        raise exc
     db.refresh(w)
     return w
 
@@ -362,11 +405,8 @@ def get_stats(db: Session, user_id: int, days: int = 30) -> schemas.Stats:
 
     workout_map = {r.day: r.cnt for r in workout_rows}
 
-    # Build daily stats from the 3 result maps
+    # Build daily stats (oldest -> today) for the response.
     day_stats = []
-    streak = 0
-    streak_active = True
-
     for i in range(days - 1, -1, -1):
         d = today - timedelta(days=i)
         m = meal_map.get(d)
@@ -382,11 +422,26 @@ def get_stats(db: Session, user_id: int, days: int = 30) -> schemas.Stats:
             workout_count=workout_map.get(d, 0),
         ))
 
-        if streak_active:
-            if cal > 0:
-                streak += 1
-            elif i != 0:
-                streak_active = False
+    # Текущий streak — считаем СПРАВА НАЛЕВО (от сегодня к самому старому
+    # дню окна), останавливаемся на первом «пустом» (cal==0). Сегодня
+    # допустимо иметь 0 (юзер ещё ничего не залогал, но streak в процессе),
+    # — оно не обнуляет серию, но и не считается +1.
+    #
+    # Прежняя реализация шла слева направо и при первом же 0-дне (что
+    # норма для большинства окон в 30 дней) обнуляла `streak_active`,
+    # из-за чего streak был 0 у всех, кроме идеальных юзеров.
+    streak = 0
+    for offset in range(0, days):
+        d = today - timedelta(days=offset)
+        m = meal_map.get(d)
+        cal = float(m.cal or 0) if m else 0.0
+        if cal > 0:
+            streak += 1
+        elif offset == 0:
+            # Сегодня без записей — серия не сломана, но и +1 не даём.
+            continue
+        else:
+            break
 
     active = [d for d in day_stats if d.calories > 0]
     return schemas.Stats(

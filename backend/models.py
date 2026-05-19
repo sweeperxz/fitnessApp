@@ -144,6 +144,10 @@ class UserFood(Base):
     name = Column(String, index=True)
     brand = Column(String, nullable=True)
     barcode = Column(String, index=True, nullable=True)
+    # Раньше было Integer — терялась десятичная часть КБЖУ при сохранении в
+    # «недавние»; в Meal эти поля Float, поэтому накопительно у юзеров,
+    # которые часто переиспользуют продукт из «недавних», уезжали
+    # значения. Миграция 0009 переключает колонки на DOUBLE PRECISION.
     calories = Column(Float, default=0.0)
     protein = Column(Float, default=0.0)
     fat = Column(Float, default=0.0)

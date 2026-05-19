@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getAdminUsers, updateAdminUserRole, deleteAdminUser } from '../api'
 import { useAuthContext } from '../auth/AuthContext'
@@ -7,6 +7,9 @@ import AdminHeader from './admin/components/AdminHeader'
 import AdminStateView from './admin/components/AdminStateView'
 import AdminStats from './admin/components/AdminStats'
 import AdminUserCard from './admin/components/AdminUserCard'
+import AdminPagination from './admin/components/AdminPagination'
+
+const PAGE_SIZE = 50
 
 export default function AdminPage() {
   const { t } = useTranslation()
@@ -14,14 +17,21 @@ export default function AdminPage() {
   // user_id уже есть в AuthContext — не делаем лишний getMe() round-trip.
   const myId = user?.user_id ?? null
   const [users, setUsers] = useState([])
+  // Пагинация. На бэке /admin/users отдаёт `{ items, total, skip, limit }`.
+  // Раньше фронт обрезал список на дефолтном limit=50 без UI «дальше»,
+  // поэтому хвост юзеров был невидим.
+  const [page, setPage] = useState(0)
+  const [total, setTotal] = useState(0)
+  const [adminsCount, setAdminsCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const loadData = async () => {
+  const loadData = useCallback(async (pageIndex) => {
     try {
-      const allUsers = await getAdminUsers()
-      setUsers(allUsers)
+      const resp = await getAdminUsers({ skip: pageIndex * PAGE_SIZE, limit: PAGE_SIZE })
+      setUsers(resp.items || [])
+      setTotal(resp.total || 0)
       setError('')
     } catch (err) {
       if (err.response?.status === 403) {
@@ -32,10 +42,32 @@ export default function AdminPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [t])
 
   useEffect(() => {
-    loadData()
+    loadData(page)
+  }, [page, loadData])
+
+  // adminsCount по текущей странице может быть нерепрезентативен, если
+  // юзеров > PAGE_SIZE; делаем отдельный лёгкий запрос с large-limit на
+  // /admin/users чисто для счётчика. Раньше число админов считалось по
+  // обрезанному списку и врало после 50-го юзера.
+  useEffect(() => {
+    let cancelled = false
+    getAdminUsers({ skip: 0, limit: 100 })
+      .then((resp) => {
+        if (cancelled) return
+        const all = resp.items || []
+        // Если юзеров больше 100 — мы всё равно увидим хотя бы первую сотню;
+        // дальнейшая точность не критична для бейджа в шапке.
+        setAdminsCount(all.filter((u) => u.role === 'admin').length)
+      })
+      .catch(() => {
+        // тихо: главный loadData уже обработает 403/load_fail
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const handleToggleRole = async user => {
@@ -54,7 +86,7 @@ export default function AdminPage() {
     try {
       await updateAdminUserRole(user.id, newRole)
       successHaptic()
-      await loadData()
+      await loadData(page)
     } catch (err) {
       errorHaptic()
       alert(err.response?.data?.detail || t('admin.errors.action_fail'))
@@ -80,16 +112,23 @@ export default function AdminPage() {
     try {
       await deleteAdminUser(user.id)
       successHaptic()
-      await loadData()
+      // После удаления текущая страница могла стать пустой (удалили
+      // последний элемент с последней страницы) — откатываемся на одну
+      // назад, иначе UI показывал бы «empty page» без подсказки.
+      const remaining = total - 1
+      const lastPage = Math.max(0, Math.ceil(remaining / PAGE_SIZE) - 1)
+      const nextPage = Math.min(page, lastPage)
+      if (nextPage !== page) {
+        setPage(nextPage)
+      } else {
+        await loadData(nextPage)
+      }
     } catch (err) {
       errorHaptic()
       alert(err.response?.data?.detail || t('admin.errors.action_fail'))
     }
     setActionLoading(false)
   }
-
-  const totalUsers = users.length
-  const totalAdmins = users.filter(user => user.role === 'admin').length
 
   return (
     <>
@@ -101,10 +140,22 @@ export default function AdminPage() {
         {!loading && !error && (
           <div>
             <AdminStats
-              totalUsers={totalUsers}
-              totalAdmins={totalAdmins}
+              totalUsers={total}
+              totalAdmins={adminsCount}
               totalUsersLabel={t('admin.stats.all')}
               totalAdminsLabel={t('admin.stats.admins')}
+            />
+
+            <AdminPagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={total}
+              busy={actionLoading}
+              onPrev={() => setPage((p) => Math.max(0, p - 1))}
+              onNext={() => setPage((p) => p + 1)}
+              prevLabel={t('admin.pagination.prev')}
+              nextLabel={t('admin.pagination.next')}
+              rangeLabel={t('admin.pagination.range')}
             />
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 60 }}>

@@ -22,7 +22,7 @@ def test_meal_with_same_op_id_is_idempotent(client, make_user, auth_headers):
 
     payload = {
         "day": TEST_DAY,
-        "meal_type": "breakfast",
+        "meal_type": "Breakfast",
         "name": "Овсянка",
         "calories": 350,
         "protein": 12,
@@ -77,7 +77,7 @@ def test_op_id_collision_across_resource_types_is_409(client, make_user, auth_he
         "/nutrition/meal",
         json={
             "day": TEST_DAY,
-            "meal_type": "lunch",
+            "meal_type": "Lunch",
             "name": "Курица",
             "calories": 400,
             "op_id": op_id,
@@ -100,7 +100,7 @@ def test_distinct_op_ids_create_separate_meals(client, make_user, auth_headers):
     user = make_user(email="distinct-ops@example.com")
     headers = auth_headers(user.id)
 
-    base = {"day": TEST_DAY, "meal_type": "breakfast", "name": "Eggs", "calories": 200}
+    base = {"day": TEST_DAY, "meal_type": "Breakfast", "name": "Eggs", "calories": 200}
     a = client.post("/nutrition/meal", json={**base, "op_id": str(uuid.uuid4())}, headers=headers)
     b = client.post("/nutrition/meal", json={**base, "op_id": str(uuid.uuid4())}, headers=headers)
     assert a.status_code == 200 and b.status_code == 200

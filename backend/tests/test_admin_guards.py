@@ -23,8 +23,9 @@ def test_admin_can_list_users(client, make_user, auth_headers):
     resp = client.get("/admin/users", headers=auth_headers(admin.id))
     assert resp.status_code == 200
     payload = resp.json()
-    emails = {u["email"] for u in payload}
+    emails = {u["email"] for u in payload["items"]}
     assert {"admin@example.com", "user1@example.com", "user2@example.com"} <= emails
+    assert payload["total"] >= 3
 
 
 def test_admin_cannot_demote_last_admin(client, make_user, auth_headers):
@@ -73,7 +74,7 @@ def test_demoting_only_admin_via_other_admin_blocked(client, make_user, auth_hea
     # Самопонижение блокируется специальной проверкой (тест выше).
     # Здесь убеждаемся, что count_admin_users == 1.
     resp = client.get("/admin/users", headers=headers1)
-    admins = [u for u in resp.json() if u["role"] == "admin"]
+    admins = [u for u in resp.json()["items"] if u["role"] == "admin"]
     assert len(admins) == 1
 
 

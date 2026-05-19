@@ -1,10 +1,43 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { mediumHaptic, successHaptic } from '../../../utils/haptic'
+import { mediumHaptic, successHaptic, errorHaptic } from '../../../utils/haptic'
 import { deleteWorkout } from '../../../api'
 
 export default function WorkoutCard({ workout, repsLabel, kgLabel, noWeightLabel, onDeleted }) {
   const { t } = useTranslation()
+  // Защита от двойного тапа: пока запрос в полёте, кнопка отключается.
+  // Раньше delete мог отстреливаться повторно, и фронт игнорировал
+  // ошибки сервера (then-only без catch).
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDelete = async () => {
+    if (deleting) return
+    mediumHaptic()
+    setDeleting(true)
+    try {
+      const resp = await deleteWorkout(workout.id)
+      // axios-интерсептор при оффлайне возвращает { data: { _offline: true } }
+      // и кладёт DELETE в очередь — это успех «с подсказкой».
+      if (resp?.data?._offline) {
+        alert(t('workouts.errors.delete_offline_queued'))
+        onDeleted()
+        return
+      }
+      successHaptic()
+      onDeleted()
+    } catch (err) {
+      errorHaptic()
+      // 404 — скорее всего, тренировку уже удалили в другой вкладке;
+      // мягко ререндерим список, чтобы карточка пропала.
+      if (err?.response?.status === 404) {
+        onDeleted()
+        return
+      }
+      alert(err?.response?.data?.detail || t('workouts.errors.delete_failed'))
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <div
@@ -34,26 +67,10 @@ export default function WorkoutCard({ workout, repsLabel, kgLabel, noWeightLabel
         </div>
 
         <button
-          style={{
-            background: 'none',
-            border: 'none',
-            color: 'var(--text3)',
-            cursor: 'pointer',
-            padding: 4,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '50%',
-            transition: 'all 0.2s',
-          }}
-          className="hover-bg-target"
-          onClick={() => {
-            mediumHaptic()
-            deleteWorkout(workout.id).then(() => {
-              successHaptic()
-              onDeleted()
-            })
-          }}
+          className="workout-card-del"
+          onClick={handleDelete}
+          disabled={deleting}
+          style={deleting ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
             <path d="M18 6 6 18M6 6l12 12" />
