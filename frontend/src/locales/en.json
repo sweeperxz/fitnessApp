@@ -235,7 +235,8 @@
             "notes": "Notes",
             "save": "Save",
             "saving": "Saving...",
-            "no_weight": "no weight"
+            "no_weight": "no weight",
+            "add_set": "Add Set"
         },
         "lib": {
             "title": "Library",

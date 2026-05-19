@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String, Float, Date, DateTime, ForeignKey, Index
+from sqlalchemy import Boolean, Column, Integer, String, Float, Date, DateTime, ForeignKey, Index, text
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime, timezone
@@ -17,11 +17,13 @@ class User(Base):
     google_id     = Column(String, unique=True, nullable=True, index=True)  # Окреме поле для Google ID
     created_at    = Column(DateTime, default=utcnow)
 
-    profile  = relationship("Profile", back_populates="user", uselist=False, cascade="all, delete")
-    meals    = relationship("Meal",    back_populates="user", cascade="all, delete")
-    waters   = relationship("WaterLog", back_populates="user", cascade="all, delete")
-    workouts = relationship("Workout", back_populates="user", cascade="all, delete")
-    foods    = relationship("UserFood", back_populates="user", cascade="all, delete")
+    profile            = relationship("Profile", back_populates="user", uselist=False, cascade="all, delete")
+    meals              = relationship("Meal",    back_populates="user", cascade="all, delete")
+    waters             = relationship("WaterLog", back_populates="user", cascade="all, delete")
+    workouts           = relationship("Workout", back_populates="user", cascade="all, delete")
+    foods              = relationship("UserFood", back_populates="user", cascade="all, delete")
+    push_subscriptions = relationship("PushSubscription", back_populates="user", cascade="all, delete")
+    sync_operations    = relationship("SyncOperation", back_populates="user", cascade="all, delete")
 
 class Profile(Base):
     __tablename__ = "profiles"
@@ -111,29 +113,41 @@ class ExerciseLibraryItem(Base):
 class Exercise(Base):
     __tablename__ = "exercises"
     id                  = Column(Integer, primary_key=True)
-    workout_id          = Column(Integer, ForeignKey("workouts.id"))
+    workout_id          = Column(Integer, ForeignKey("workouts.id", ondelete="CASCADE"))
     library_exercise_id = Column(Integer, ForeignKey("exercise_library.id"), nullable=True, index=True)
     name                = Column(String)
-    sets                = Column(Integer, default=3)
-    reps                = Column(Integer, default=10)
-    weight_kg           = Column(Float, default=0)
 
     workout = relationship("Workout", back_populates="exercises")
     library_item = relationship("ExerciseLibraryItem", back_populates="exercises")
+    sets = relationship("ExerciseSet", back_populates="exercise", cascade="all, delete-orphan", order_by="ExerciseSet.id")
+
+
+class ExerciseSet(Base):
+    __tablename__ = "exercise_sets"
+    id          = Column(Integer, primary_key=True, index=True)
+    exercise_id = Column(Integer, ForeignKey("exercises.id", ondelete="CASCADE"), index=True, nullable=False)
+    weight_kg   = Column(Float, nullable=False, default=0.0)
+    reps        = Column(Integer, nullable=False, default=0)
+    created_at  = Column(DateTime, default=utcnow)
+
+    exercise    = relationship("Exercise", back_populates="sets")
 
 
 class UserFood(Base):
     __tablename__ = "user_foods"
+    __table_args__ = (
+        Index('ix_user_foods_global_barcode', 'barcode', unique=True, postgresql_where=text('user_id IS NULL'), sqlite_where=text('user_id IS NULL')),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=True)
     name = Column(String, index=True)
     brand = Column(String, nullable=True)
-    barcode = Column(String, unique=True, index=True, nullable=True)
-    calories = Column(Integer)
-    protein = Column(Integer)
-    fat = Column(Integer)
-    carbs = Column(Integer)
+    barcode = Column(String, index=True, nullable=True)
+    calories = Column(Float, default=0.0)
+    protein = Column(Float, default=0.0)
+    fat = Column(Float, default=0.0)
+    carbs = Column(Float, default=0.0)
     last_used = Column(DateTime, default=utcnow)
 
     user = relationship("User", back_populates="foods")
@@ -141,13 +155,13 @@ class UserFood(Base):
 class PushSubscription(Base):
     __tablename__ = "push_subscriptions"
     id         = Column(Integer, primary_key=True)
-    user_id    = Column(Integer, ForeignKey("users.id"), index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     endpoint   = Column(String, unique=True, nullable=False)
     p256dh     = Column(String, nullable=False)
     auth       = Column(String, nullable=False)
     created_at = Column(DateTime, default=utcnow)
 
-    user = relationship("User")
+    user = relationship("User", back_populates="push_subscriptions")
 
 
 class SyncOperation(Base):
@@ -157,11 +171,11 @@ class SyncOperation(Base):
     )
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     op_id = Column(String, nullable=False)
     operation_type = Column(String, nullable=False)
     resource_type = Column(String, nullable=False)
     resource_id = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=utcnow)
 
-    user = relationship("User")
+    user = relationship("User", back_populates="sync_operations")

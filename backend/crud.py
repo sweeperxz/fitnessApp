@@ -270,8 +270,14 @@ def create_workout(db: Session, user_id: int, data: schemas.WorkoutCreate):
     db.flush()  # get w.id without committing yet
     if exercises_data:
         for ex_data in exercises_data:
-            ex = models.Exercise(workout_id=w.id, **_exercise_payload(db, ex_data))
+            payload = _exercise_payload(db, ex_data)
+            sets_data = payload.pop("sets", [])
+            ex = models.Exercise(workout_id=w.id, **payload)
             db.add(ex)
+            db.flush()
+            for s in sets_data:
+                db_set = models.ExerciseSet(exercise_id=ex.id, **s)
+                db.add(db_set)
     db.commit()
     db.refresh(w)
     return w
@@ -285,9 +291,14 @@ def add_exercise(db: Session, workout_id: int, user_id: int, data: schemas.Exerc
     if not w:
         return None
     exercise_payload = _exercise_payload(db, data)
+    sets_data = exercise_payload.pop("sets", [])
 
     ex = models.Exercise(workout_id=workout_id, **exercise_payload)
     db.add(ex)
+    db.flush()
+    for s in sets_data:
+        db_set = models.ExerciseSet(exercise_id=ex.id, **s)
+        db.add(db_set)
     db.commit()
     db.refresh(ex)
     return ex
@@ -485,8 +496,6 @@ def update_user_role(db: Session, user_id: int, role: str):
 def delete_user(db: Session, user_id: int):
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if user:
-        # Delete push subscriptions explicitly as they don't have cascade in SQLAlchemy
-        db.query(models.PushSubscription).filter(models.PushSubscription.user_id == user_id).delete()
         db.delete(user)
         db.commit()
         return True

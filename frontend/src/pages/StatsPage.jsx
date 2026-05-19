@@ -90,8 +90,10 @@ export default function StatsPage() {
 
   return (
     <>
-      <div className="page-header">
-        <div className="page-title">{t('stats.title').slice(0, 4)}<span>{t('stats.title').slice(4)}</span></div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingTop: 6 }}>
+        <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: -0.8, color: 'var(--text)' }}>
+          {t('stats.title').slice(0, 4)}<span style={{ color: 'var(--blue2)' }}>{t('stats.title').slice(4)}</span>
+        </div>
       </div>
 
       <StatsPeriodPicker

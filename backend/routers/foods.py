@@ -91,8 +91,19 @@ async def find_food_by_barcode(
     if not clean_barcode:
         raise HTTPException(400, "Invalid barcode")
 
-    # 1. Ищем в нашей локальной БД продуктов
-    local_food = db.query(models.UserFood).filter(models.UserFood.barcode == clean_barcode).first()
+    # 1. Ищем в нашей локальной БД продуктов (сначала пользовательский, потом глобальный)
+    local_food = (
+        db.query(models.UserFood)
+        .filter(models.UserFood.barcode == clean_barcode, models.UserFood.user_id == user.id)
+        .first()
+    )
+    if not local_food:
+        local_food = (
+            db.query(models.UserFood)
+            .filter(models.UserFood.barcode == clean_barcode, models.UserFood.user_id == None)
+            .first()
+        )
+
     if local_food:
         return {
             "name": local_food.name,
@@ -119,10 +130,10 @@ async def find_food_by_barcode(
             name=food["name"],
             brand=food.get("brand"),
             barcode=clean_barcode,
-            calories=int(food["calories"]),
-            protein=int(food["protein"]),
-            fat=int(food["fat"]),
-            carbs=int(food["carbs"])
+            calories=float(food["calories"]),
+            protein=float(food["protein"]),
+            fat=float(food["fat"]),
+            carbs=float(food["carbs"])
         )
         db.add(cached_food)
         db.commit()
@@ -154,12 +165,12 @@ def add_recent_food(
     user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # Пытаемся найти по штрих-коду (если передан) или по имени для данного юзера
+    # Пытаемся найти по штрих-коду (если передан) или по имени для данного юзера (только его собственные записи)
     existing = None
     if data.barcode:
         existing = (
             db.query(models.UserFood)
-            .filter(models.UserFood.barcode == data.barcode)
+            .filter(models.UserFood.user_id == user.id, models.UserFood.barcode == data.barcode)
             .first()
         )
 
@@ -180,11 +191,6 @@ def add_recent_food(
         existing.carbs = data.carbs
         if data.barcode:
             existing.barcode = data.barcode
-        # Если это был глобальный продукт, привязываем его к юзеру в историю,
-        # либо оставляем как есть, но для отображения в "недавних" юзера
-        # присваиваем user_id.
-        if existing.user_id is None:
-            existing.user_id = user.id
         record = existing
     else:
         record = models.UserFood(

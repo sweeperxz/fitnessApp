@@ -95,7 +95,7 @@ export default function AdminPage() {
     <>
       <AdminHeader title={t('admin.title')} />
 
-      <div className="card fade-in">
+      <div className="fade-in">
         <AdminStateView loading={loading} error={error} loadingLabel={t('common.loading')} />
 
         {!loading && !error && (

@@ -65,8 +65,8 @@ export default function WorkoutsPage() {
 
   const dayWorkouts = workouts.filter(w => w.day === day.format('YYYY-MM-DD'))
   const hasWorkoutForDay = d => workouts.some(w => w.day === d.format('YYYY-MM-DD'))
-  const totalSets = workouts.reduce((a, w) => a + (w.exercises || []).reduce((b, e) => b + e.sets, 0), 0)
-  const totalTons = workouts.reduce((a, w) => a + (w.exercises || []).reduce((b, e) => b + e.sets * e.reps * e.weight_kg / 1000, 0), 0)
+  const totalSets = workouts.reduce((a, w) => a + (w.exercises || []).reduce((b, e) => b + (e.sets || []).length, 0), 0)
+  const totalTons = workouts.reduce((a, w) => a + (w.exercises || []).reduce((b, e) => b + (e.sets || []).reduce((c, s) => c + (s.reps || 0) * (s.weight_kg || 0), 0) / 1000, 0), 0)
 
   const tonnageUnit = t('today.ml')[0].toLowerCase() === 'м' ? 'т' : 't'
 

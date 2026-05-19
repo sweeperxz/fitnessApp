@@ -102,16 +102,27 @@ class ExerciseLibraryItem(BaseModel):
     is_active: bool
     class Config: from_attributes = True
 
+class ExerciseSetCreate(BaseModel):
+    weight_kg: float = Field(default=0.0, ge=0, le=1000)
+    reps: int = Field(default=0, ge=0, le=1000)
+
+class ExerciseSet(ExerciseSetCreate):
+    id: int
+    exercise_id: int
+    created_at: datetime
+    class Config: from_attributes = True
+
 class ExerciseCreate(BaseModel):
     name: str
     library_exercise_id: Optional[int] = None
-    sets: int = Field(default=3, ge=1, le=100)
-    reps: int = Field(default=10, ge=1, le=1000)
-    weight_kg: float = Field(default=0, ge=0, le=1000)
+    sets: List[ExerciseSetCreate] = []
 
-class Exercise(ExerciseCreate):
+class Exercise(BaseModel):
     id: int
     workout_id: int
+    name: str
+    library_exercise_id: Optional[int] = None
+    sets: List[ExerciseSet] = []
     class Config: from_attributes = True
 
 class WorkoutCreate(BaseModel):
@@ -158,10 +169,10 @@ class ChatRequest(BaseModel):
 class FoodItemBase(BaseModel):
     name: str
     brand: Optional[str] = ""
-    calories: int
-    protein: int
-    fat: int
-    carbs: int
+    calories: float = Field(default=0.0, ge=0)
+    protein: float = Field(default=0.0, ge=0)
+    fat: float = Field(default=0.0, ge=0)
+    carbs: float = Field(default=0.0, ge=0)
     barcode: Optional[str] = None
 
 class FoodItemCreate(FoodItemBase):
